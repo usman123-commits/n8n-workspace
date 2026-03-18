@@ -1,1 +1,14 @@
+# Secrets - never commit these
 .env
+.mcp.json
+gcp-oauth.keys.json
+*.token.json
+tokens.json
+~/.config/google-drive-mcp/
+
+# n8n local data
+.n8n/
+
+# OS
+.DS_Store
+Thumbs.db
