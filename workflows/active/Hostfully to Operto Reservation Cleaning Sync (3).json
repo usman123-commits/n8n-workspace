@@ -1,0 +1,1683 @@
+{
+  "name": "Hostfully to Operto Reservation Cleaning Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://platform.hostfully.com/api/v3/properties/996b0202-6422-45f0-9244-c4060afb8035",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "agencyUid",
+              "value": "35842d2f-b5c1-46fa-a33d-a12756b42ed8"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "id": "8b82ebce-53c7-47c9-957d-35437a99f945",
+      "name": "Fetch Hostfully Leads1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -19856,
+        -1136
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9KxNwfaP8qRHdRPm",
+          "name": "Hostfully API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleaningJobId": "={{ $json.cleaningJobId }}"
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "guestName",
+              "displayName": "guestName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkIn",
+              "displayName": "checkIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkOut",
+              "displayName": "checkOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "adultCount",
+              "displayName": "adultCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdUtc",
+              "displayName": "createdUtc",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningStatus",
+              "displayName": "cleaningStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "childrenCount",
+              "displayName": "childrenCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "maintenanceStatus",
+              "displayName": "maintenanceStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payrollStatus",
+              "displayName": "payrollStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f6d2762f-3073-48c4-864a-2ed15cb4b10f",
+      "name": "Update Reservation with Cleaning Job ID",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -16272,
+        -672
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CleaningJobs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "cleaningJobId": "={{ $json.cleaningJobId }}",
+            "bookingUid": "={{ $json.bookingUid }}",
+            "propertyUid": "={{ $json.propertyUid }}",
+            "cleaningDate": "={{ $json.cleaningDate }}",
+            "cleaningTime": "={{ $json.cleaningTime }}",
+            "checkoutTimeUTC": "={{ $json.checkoutTimeUTC }}",
+            "scheduledCleaningTimeUTC": "={{ $json.scheduledCleaningTimeUTC }}",
+            "status": "PENDING",
+            "createdAtSystem": "={{ $json.createdAtSystem }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleaningDate",
+              "displayName": "cleaningDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleaningTime",
+              "displayName": "cleaningTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "assignedCleaner",
+              "displayName": "assignedCleaner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clockIn",
+              "displayName": "clockIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clockOut",
+              "displayName": "clockOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workedHours",
+              "displayName": "workedHours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerId",
+              "displayName": "cleanerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "assignedAt",
+              "displayName": "assignedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notificationStatus",
+              "displayName": "notificationStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendarStatus",
+              "displayName": "calendarStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendarEventId",
+              "displayName": "calendarEventId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendarId",
+              "displayName": "calendarId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processingFlag",
+              "displayName": "processingFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clockInTimeUTC",
+              "displayName": "clockInTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockInLat",
+              "displayName": "gpsClockInLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockInLng",
+              "displayName": "gpsClockInLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsStatus",
+              "displayName": "gpsStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lateFlag",
+              "displayName": "lateFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkoutTimeUTC",
+              "displayName": "checkoutTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduledCleaningTimeUTC",
+              "displayName": "scheduledCleaningTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e377141c-e468-4a85-a299-06552bc88fac",
+      "name": "Create Cleaning Job Record",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -16496,
+        -816
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Strict UTC only. Only checkOutZonedDateTime from Hostfully. scheduledCleaningTimeUTC = checkoutTimeUTC.\nconst ZONED_REGEX = /[zZ]|[+-]\\d{2}:\\d{2}$/;\nconst j = $input.first().json;\n// Always read the zoned checkout from Merge Lead and Lookup so we keep the Hostfully field\n// even when this node is reached via Create Reservation Record.\nconst lead = (() => {\n  try {\n    const n = $('Merge Lead and Lookup');\n    if (n && typeof n.last === 'function') {\n      const v = n.last().json;\n      if (v && typeof v === 'object') return v;\n    }\n  } catch (_) {}\n  return j || {};\n})();\nconst bookingUid = lead?.uid || lead?.bookingUid || j?.uid || j?.bookingUid || '';\nconst cleaningJobId = bookingUid ? bookingUid + '_CLEAN' : '';\nconst rawCheckout = lead?.checkOutZonedDateTime;\nif (!rawCheckout || typeof rawCheckout !== 'string' || rawCheckout.trim() === '')\n  throw new Error('Missing required column configuration: checkout time not provided');\nconst s = rawCheckout.trim();\nif (!ZONED_REGEX.test(s))\n  throw new Error('Invalid checkout time: timezone offset or Z required');\nconst checkoutDate = new Date(s);\nif (isNaN(checkoutDate.getTime()))\n  throw new Error('Invalid checkout time: cannot parse date');\nconst checkoutTimeUTC = checkoutDate.toISOString();\nconst scheduledCleaningTimeUTC = checkoutTimeUTC;\nconst dateTime = s;\nreturn [{ json: { cleaningJobId, bookingUid, propertyUid: lead?.propertyUid ?? j?.propertyUid ?? '', cleaningDate: dateTime, cleaningTime: dateTime, checkoutTimeUTC, scheduledCleaningTimeUTC, status: 'PENDING', assignedCleaner: '', clockIn: '', clockOut: '', workedHours: '', createdAtSystem: new Date().toISOString() } }];"
+      },
+      "id": "297b828a-7422-4a87-bb0a-d0589b005300",
+      "name": "Prepare Cleaning Job Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16720,
+        -816
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.uid }}",
+            "propertyUid": "={{ $json.propertyUid }}",
+            "guestName": "={{ ($json.guestInformation?.firstName || '') + ' ' + ($json.guestInformation?.lastName || '') }}",
+            "checkIn": "={{ $json.checkInLocalDateTime }}",
+            "checkOut": "={{ $json.checkOutLocalDateTime }}",
+            "adultCount": "={{ $json.guestInformation?.adultCount ?? '' }}",
+            "source": "={{ $json.channel }}",
+            "createdUtc": "={{ $json.metadata?.createdUtcDateTime }}",
+            "cleaningStatus": "PENDING",
+            "maintenanceStatus": "NONE",
+            "payrollStatus": "NOT_STARTED",
+            "createdAtSystem": "={{ $now.toISO() }}",
+            "childrenCount": "={{ $json.guestInformation?.childrenCount ?? '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "guestName",
+              "displayName": "guestName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "checkIn",
+              "displayName": "checkIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "checkOut",
+              "displayName": "checkOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "adultCount",
+              "displayName": "adultCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "createdUtc",
+              "displayName": "createdUtc",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleaningStatus",
+              "displayName": "cleaningStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "childrenCount",
+              "displayName": "childrenCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "maintenanceStatus",
+              "displayName": "maintenanceStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payrollStatus",
+              "displayName": "payrollStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9bd07ea3-f194-4e83-b725-1c931849265a",
+      "name": "Create Reservation Record",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -16944,
+        -912
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cleaning-job-needed",
+              "leftValue": "={{ ($json.cleaningJobId ?? '').toString().trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1e73630f-0b7f-4d91-bf9c-fa0cc4bd2cd5",
+      "name": "Cleaning Job Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -16944,
+        -720
+      ],
+      "notes": "When reservation exists: TRUE = no cleaningJobId â†’ create cleaning job; FALSE = has cleaning job â†’ skip."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "if-reservation-exists",
+              "leftValue": "={{ $json._noMatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8b0c694e-d61e-454f-b027-388bd9b589ac",
+      "name": "Reservation Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -17168,
+        -816
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run after Ensure One Item; read lead from Split In Batches and lookup from Ensure One Item.\nconst lead = $('Split In Batches').last().json;\nconst lookup = $('Ensure One Item').last().json;\nreturn [{ json: { ...lead, ...lookup } }];"
+      },
+      "id": "67548637-711b-4bee-a29a-52ff85d507c4",
+      "name": "Merge Lead and Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17392,
+        -816
+      ],
+      "notes": "Replaces Merge node: combines current lead + lookup result so both are always defined."
+    },
+    {
+      "parameters": {
+        "jsCode": "let items = [];\ntry { if ($input && typeof $input.all === 'function') items = $input.all(); } catch (_) {}\nif (!items.length) return [{ json: { _noMatch: true } }];\nconst first = items[0].json || {};\n// When Lookup has \"Always output data\", 0 rows still send one item - treat as no match if no real reservation data\nconst hasRealMatch = first.bookingUid !== undefined && first.bookingUid !== null && String(first.bookingUid).trim() !== '';\nif (!hasRealMatch) return [{ json: { _noMatch: true } }];\nreturn [{ json: { ...first, _noMatch: false } }];"
+      },
+      "id": "96de352b-a83b-4840-8ce2-9b573d97aad7",
+      "name": "Ensure One Item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17616,
+        -816
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.uid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0b8c6b69-02ba-4230-8341-b142462fd4c8",
+      "name": "Lookup Reservation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -17840,
+        -816
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "8384bc8c-9156-4f57-b195-246ca6882d36",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -18064,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "timeStamps",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "={{ $json.key }}",
+            "storedTimestamp": "={{ $json.storedTimestamp }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "id": "key",
+              "displayName": "key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "storedTimestamp",
+              "displayName": "storedTimestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "87c3bebc-0e20-449f-ae9a-8e6020ae8cac",
+      "name": "Update Stored Timestamp",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -17616,
+        -624
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Updates the row where key=config with new storedTimestamp. Same sheet as Read Last Timestamp."
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Accumulate Leads').last().json;\nconst leads = data?.accumulatedLeads || [];\nlet maxUpdated = null;\nfor (const lead of leads) {\n  const t = lead?.metadata?.updatedUtcDateTime;\n  if (t && (!maxUpdated || t > maxUpdated)) maxUpdated = t;\n}\nlet newStoredTimestamp = maxUpdated || data?.storedTimestamp || '1970-01-01T00:00:00.000Z';\n// Advance by 1 ms so the next run never sees \"equal\" timestamp (avoids skipping a booking forever)\nif (maxUpdated) {\n  const d = new Date(newStoredTimestamp);\n  d.setUTCMilliseconds(d.getUTCMilliseconds() + 1);\n  newStoredTimestamp = d.toISOString();\n}\nreturn [{ json: { key: 'config', storedTimestamp: newStoredTimestamp } }];"
+      },
+      "id": "af6ed3d5-e1f7-40fb-a04a-7e7de52183e2",
+      "name": "Compute Max After Loop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17840,
+        -624
+      ],
+      "notes": "Runs only when Split In Batches (Done) fires. Reads from Accumulate Leads to avoid timestamp race."
+    },
+    {
+      "parameters": {
+        "jsCode": "const storedTimestamp = $('Accumulate Leads').last().json?.storedTimestamp || '1970-01-01T00:00:00.000Z';\nconst items = $input.all();\nconst filtered = [];\nfor (const item of items) {\n  const lead = item.json;\n  const created = lead?.metadata?.createdUtcDateTime;\n  if (created && created > storedTimestamp && lead?.type === 'BOOKING' && lead?.status === 'BOOKED') {\n    filtered.push(item);\n  }\n}\nreturn filtered;"
+      },
+      "id": "5ec60236-0be5-4c63-97b1-5d8592fb881d",
+      "name": "Filter New Bookings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18288,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Accumulate Leads').last().json;\nconst leads = data?.accumulatedLeads || [];\nconst storedTimestamp = data?.storedTimestamp\n  || '1970-01-01T00:00:00.000Z';\n\nconst ZONED_REGEX = /[zZ]|[+-]\\d{2}:\\d{2}$/;\n\nconst candidates = [];\n\nfor (const lead of leads) {\n  const created = lead?.metadata?.createdUtcDateTime;\n  const updated = lead?.metadata?.updatedUtcDateTime;\n\n  if (lead?.type !== 'BOOKING' || lead?.status !== 'BOOKED') continue;\n  if (!updated || !created) continue;\n  if (updated <= storedTimestamp) continue;\n  if (created > storedTimestamp) continue;\n\n  const rawCheckout = lead?.checkOutZonedDateTime;\n  if (!rawCheckout || !ZONED_REGEX.test(rawCheckout.trim())) continue;\n\n  const checkoutDate = new Date(rawCheckout.trim());\n  if (isNaN(checkoutDate.getTime())) continue;\n\n  const checkoutTimeUTC = checkoutDate.toISOString();\n  const checkoutDateOnly = checkoutTimeUTC.substring(0, 10);\n  const checkoutTimeOnly = checkoutTimeUTC.substring(11, 16);\n\n  candidates.push({\n    bookingUid: lead.uid || '',\n    propertyUid: lead.propertyUid || '',\n    newCheckOut: lead.checkOutLocalDateTime || checkoutDateOnly,\n    newCheckoutTimeUTC: checkoutTimeUTC,\n    newScheduledCleaningTimeUTC: checkoutTimeUTC,\n    newCleaningDate: checkoutDateOnly,\n    newCleaningTime: checkoutTimeOnly\n  });\n}\n\nreturn candidates.map(c => ({ json: c }));"
+      },
+      "id": "feca6993-ed8f-49fd-b9f2-7a4abd83068d",
+      "name": "Detect Extended Checkouts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18064,
+        -240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "499d5918-ff39-4e7f-8901-e1e2c6e66bb2",
+      "name": "Split Extended Candidates",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -17840,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e9b7540f-05d6-4f5a-81b9-565d0deb0e84",
+      "name": "Lookup Reservation for Candidate",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -17616,
+        -240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a set of bookingUids that were found in the sheet\nconst lookupItems = $input.all();\nconst foundUids = new Set();\nfor (const item of lookupItems) {\n  const uid = (item.json.bookingUid ?? '').toString().trim();\n  if (uid) foundUids.add(uid);\n}\n\n// Only pass through candidates whose bookingUid exists in the sheet\nconst candidates = $('Split Extended Candidates').all();\nconst results = [];\n\nfor (const item of candidates) {\n  const uid = (item.json.bookingUid ?? '').toString().trim();\n  if (uid && foundUids.has(uid)) {\n    results.push({ json: item.json });\n  }\n}\n\nreturn results;"
+      },
+      "id": "8904deb9-95b0-4163-b32e-2be8d613d10d",
+      "name": "Reservation Exists Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17392,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/extended-checkout-handler",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "bookingUid",
+              "value": "={{ $json.bookingUid }}"
+            },
+            {
+              "name": "propertyUid",
+              "value": "={{ $json.propertyUid }}"
+            },
+            {
+              "name": "newCheckOut",
+              "value": "={{ $json.newCheckOut }}"
+            },
+            {
+              "name": "newCheckoutTimeUTC",
+              "value": "={{ $json.newCheckoutTimeUTC }}"
+            },
+            {
+              "name": "newScheduledCleaningTimeUTC",
+              "value": "={{ $json.newScheduledCleaningTimeUTC }}"
+            },
+            {
+              "name": "newCleaningDate",
+              "value": "={{ $json.newCleaningDate }}"
+            },
+            {
+              "name": "newCleaningTime",
+              "value": "={{ $json.newCleaningTime }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a05cd0ac-9085-4488-a134-563553979970",
+      "name": "Trigger Extended Checkout Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -17168,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "accumulatedLeads",
+        "options": {}
+      },
+      "id": "60beb15a-a7d1-4286-a211-30f0e60bee6b",
+      "name": "Output Leads Individually",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -18512,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "d43ff919-7496-4ee8-b3ec-dc0cb340f6e0",
+              "leftValue": "={{ $json.cursor }}",
+              "rightValue": "null",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "46573271-6ede-4afe-941c-f2a5bceb6945",
+      "name": "Has More Pages?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -18736,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use previous run of Accumulate Leads when runIndex > 0, else Initialize Cursor\nconst isFirstRun = typeof $runIndex === 'undefined' || $runIndex === 0;\nconst previousData = isFirstRun\n  ? $('Initialize Cursor').first().json\n  : $('Accumulate Leads').first(0, $runIndex - 1).json;\n\nconst response = $('Fetch Hostfully Leads').all()[0].json;\nconst newLeads = response.leads || [];\nconst nextCursor = response._paging?._nextCursor ?? null;\nconst storedTimestamp = previousData.storedTimestamp;\n\nreturn [{\n  json: {\n    cursor: nextCursor,\n    accumulatedLeads: [...(previousData.accumulatedLeads || []), ...newLeads],\n    storedTimestamp: storedTimestamp\n  }\n}];"
+      },
+      "id": "aaa784f6-cfde-462e-b359-3a085f06e194",
+      "name": "Accumulate Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18960,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://platform.hostfully.com/api/v3/leads?updatedSince={{ $json.storedTimestamp }}{{ $json.cursor ? '&_cursor=' + $json.cursor : '' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "agencyUid",
+              "value": "35842d2f-b5c1-46fa-a33d-a12756b42ed8"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "id": "695ca533-f2f8-4455-b4d4-0416f939117b",
+      "name": "Fetch Hostfully Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -19184,
+        -240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9KxNwfaP8qRHdRPm",
+          "name": "Hostfully API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let storedTimestamp = '1970-01-01T00:00:00.000Z';\ntry {\n  const readOut = $('Read Last Timestamp').first().json;\n  const raw = readOut?.storedTimestamp || readOut?.lastProcessedTimestamp;\n  if (typeof raw === 'string') {\n    storedTimestamp = raw.includes(' ') ? raw.replace(' ', 'T') : raw;\n  } else if (raw) {\n    storedTimestamp = raw;\n  }\n} catch (_) {}\nreturn [{ json: { cursor: null, accumulatedLeads: [], storedTimestamp } }];"
+      },
+      "id": "fee9fdc7-3332-473a-9f2c-54977ed6ab77",
+      "name": "Initialize Cursor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -19408,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "timeStamps",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "d430d31d-c098-4b9b-b6a8-af0f0b647dae",
+      "name": "Read Last Timestamp",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -19632,
+        -240
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Configure: Document (spreadsheet), Sheet. Sheet must have columns 'key' (A) and 'storedTimestamp' (B). Row 2: key=config, storedTimestamp=<ISO date>. Output field: storedTimestamp."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -19856,
+        -240
+      ],
+      "id": "7a793cf7-738c-40fc-8855-a42781afc31f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = $('Accumulate Leads').last().json?.accumulatedLeads ?? [];\nconst candidates = leads.filter(l =>\n  l.type === 'BOOKING' &&\n  l.status === 'CANCELLED'\n);\nreturn candidates.map(c => ({ json: c }));"
+      },
+      "id": "3346237d-505f-450c-b189-66f6ecc59200",
+      "name": "Detect Cancellations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18064,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.uid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6ebc19f1-2abf-4c37-9681-0720416fd346",
+      "name": "Lookup Reservation for Cancellation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -17840,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a map of sheet reservations keyed by bookingUid\nconst lookupItems = $input.all();\nconst sheetMap = {};\nfor (const item of lookupItems) {\n  const uid = (item.json.bookingUid ?? '').toString().trim();\n  if (uid) sheetMap[uid] = item.json;\n}\n\n// For each cancelled candidate, check if it exists in the sheet\nconst candidates = $('Detect Cancellations').all();\nconst results = [];\n\nfor (const item of candidates) {\n  const candidate = item.json;\n  const uid = (candidate.uid ?? '').toString().trim();\n  if (!uid) continue;\n\n  const sheetRow = sheetMap[uid];\n\n  // Skip if no reservation row found in sheet\n  if (!sheetRow) continue;\n\n  // Skip if already cancelled in sheet (idempotency)\n  const status = (sheetRow.cleaningStatus ?? '').toString().trim().toUpperCase();\n  if (status === 'CANCELLED') continue;\n\n  results.push({ json: candidate });\n}\n\nreturn results;"
+      },
+      "id": "dfd4f108-c08a-491b-a28e-aa81f1f2c869",
+      "name": "Cancellation Idempotency Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17616,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/cancellation-handler",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "bookingUid",
+              "value": "={{ $json.uid }}"
+            },
+            {
+              "name": "propertyUid",
+              "value": "={{ $json.propertyUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d305f544-54aa-40d9-9bca-a1926c065ba3",
+      "name": "Trigger Cancellation Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -17392,
+        -48
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Create Cleaning Job Record": {
+      "main": [
+        [
+          {
+            "node": "Update Reservation with Cleaning Job ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Cleaning Job Data": {
+      "main": [
+        [
+          {
+            "node": "Create Cleaning Job Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Reservation Record": {
+      "main": [
+        [
+          {
+            "node": "Prepare Cleaning Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaning Job Needed?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Cleaning Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservation Exists?": {
+      "main": [
+        [
+          {
+            "node": "Cleaning Job Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Reservation Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Lead and Lookup": {
+      "main": [
+        [
+          {
+            "node": "Reservation Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure One Item": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead and Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Reservation": {
+      "main": [
+        [
+          {
+            "node": "Ensure One Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reservation with Cleaning Job ID": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Compute Max After Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Max After Loop": {
+      "main": [
+        [
+          {
+            "node": "Update Stored Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Bookings": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Detect Extended Checkouts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Detect Cancellations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Extended Checkouts": {
+      "main": [
+        [
+          {
+            "node": "Split Extended Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Extended Candidates": {
+      "main": [
+        [
+          {
+            "node": "Lookup Reservation for Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Reservation for Candidate": {
+      "main": [
+        [
+          {
+            "node": "Reservation Exists Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservation Exists Guard": {
+      "main": [
+        [
+          {
+            "node": "Trigger Extended Checkout Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Leads Individually": {
+      "main": [
+        [
+          {
+            "node": "Filter New Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has More Pages?1": {
+      "main": [
+        [
+          {
+            "node": "Output Leads Individually",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Hostfully Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accumulate Leads": {
+      "main": [
+        [
+          {
+            "node": "Has More Pages?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Hostfully Leads": {
+      "main": [
+        [
+          {
+            "node": "Accumulate Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Cursor": {
+      "main": [
+        [
+          {
+            "node": "Fetch Hostfully Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Last Timestamp": {
+      "main": [
+        [
+          {
+            "node": "Initialize Cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Last Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Cancellations": {
+      "main": [
+        [
+          {
+            "node": "Lookup Reservation for Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Reservation for Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Cancellation Idempotency Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancellation Idempotency Guard": {
+      "main": [
+        [
+          {
+            "node": "Trigger Cancellation Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "805d00c3-edd3-4b10-829d-3dc8944ab48f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "id": "JKS8Imjt5Nvp1ReG",
+  "tags": []
+}

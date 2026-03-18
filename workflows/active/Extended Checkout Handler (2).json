@@ -1,0 +1,1477 @@
+{
+  "name": "Extended Checkout Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "extended-checkout-handler",
+        "options": {}
+      },
+      "id": "88a67c4c-4f47-4979-93bc-bb52e384a927",
+      "name": "Receive Extended Checkout Payload",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        208
+      ],
+      "webhookId": "a1b2c3d4-1234-5678-9abc-def012345678"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 622787563,
+          "mode": "list",
+          "cachedResultName": "CleaningJobs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit#gid=622787563"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.body.bookingUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "103fdb1c-77b8-4d3e-a0f1-f30a7ccfebe9",
+      "name": "Lookup Cleaning Job",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -416,
+        208
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Receive Extended Checkout Payload').item.json.body || {};\nconst items = $input.all();\nconst first = items[0]?.json || {};\nconst hasJob = items.length > 0 && (first.bookingUid !== undefined && first.bookingUid !== null && String(first.bookingUid).trim() !== '');\nreturn [{ json: { ...body, ...(hasJob ? first : {}), _jobFound: hasJob } }];"
+      },
+      "id": "d08517b3-b718-4063-8a6b-0d98aa1b73c5",
+      "name": "Prepare Job Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "job-found",
+              "leftValue": "={{ $json._jobFound }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "29c864ab-b404-4633-a3ee-b28e531aff95",
+      "name": "Job Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        32,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "pending",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "PENDING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PENDING"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "assigned",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "ASSIGNED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ASSIGNED"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "85eef57a-562d-4cd2-969d-869ad4976204",
+      "name": "Route by Job Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        256,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CleaningJobs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $('Receive Extended Checkout Payload').item.json.body.bookingUid }}",
+            "checkoutTimeUTC": "={{ $('Receive Extended Checkout Payload').item.json.body.newCheckoutTimeUTC }}",
+            "scheduledCleaningTimeUTC": "={{ $('Receive Extended Checkout Payload').item.json.body.newScheduledCleaningTimeUTC }}",
+            "cleaningDate": "={{ $('Receive Extended Checkout Payload').item.json.body.newCleaningDate }}",
+            "cleaningTime": "={{ $('Receive Extended Checkout Payload').item.json.body.newCleaningTime }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningDate",
+              "displayName": "cleaningDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleaningTime",
+              "displayName": "cleaningTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assignedCleaner",
+              "displayName": "assignedCleaner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockIn",
+              "displayName": "clockIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockOut",
+              "displayName": "clockOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workedHours",
+              "displayName": "workedHours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleanerId",
+              "displayName": "cleanerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assignedAt",
+              "displayName": "assignedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notificationStatus",
+              "displayName": "notificationStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendarStatus",
+              "displayName": "calendarStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendarEventId",
+              "displayName": "calendarEventId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendarId",
+              "displayName": "calendarId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processingFlag",
+              "displayName": "processingFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockInTimeUTC",
+              "displayName": "clockInTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockInLat",
+              "displayName": "gpsClockInLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockInLng",
+              "displayName": "gpsClockInLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsStatus",
+              "displayName": "gpsStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lateFlag",
+              "displayName": "lateFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkoutTimeUTC",
+              "displayName": "checkoutTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduledCleaningTimeUTC",
+              "displayName": "scheduledCleaningTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "56c7bb55-19f9-49b1-9bf7-760cb9eed048",
+      "name": "Update CleaningJob PENDING",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CleaningJobs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $('Receive Extended Checkout Payload').item.json.body.bookingUid }}",
+            "checkoutTimeUTC": "={{ $('Receive Extended Checkout Payload').item.json.body.newCheckoutTimeUTC }}",
+            "scheduledCleaningTimeUTC": "={{ $('Receive Extended Checkout Payload').item.json.body.newScheduledCleaningTimeUTC }}",
+            "cleaningDate": "={{ $('Receive Extended Checkout Payload').item.json.body.newCleaningDate }}",
+            "cleaningTime": "={{ $('Receive Extended Checkout Payload').item.json.body.newCleaningTime }}"
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "checkoutTimeUTC",
+              "displayName": "checkoutTimeUTC",
+              "type": "string"
+            },
+            {
+              "id": "scheduledCleaningTimeUTC",
+              "displayName": "scheduledCleaningTimeUTC",
+              "type": "string"
+            },
+            {
+              "id": "cleaningDate",
+              "displayName": "cleaningDate",
+              "type": "string"
+            },
+            {
+              "id": "cleaningTime",
+              "displayName": "cleaningTime",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9ef40998-da3e-4df8-969f-49dfcf2f2b42",
+      "name": "Update CleaningJob ASSIGNED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        -128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "74268c6d-08d9-4a1e-bfc2-262b1adf9aa3",
+      "name": "Skip (Job Active or Completed)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Receive Extended Checkout Payload').item.json.body || {};\nconst job = $('Lookup Cleaning Job').item.json || {};\nconst startStr = body.newScheduledCleaningTimeUTC;\nif (!startStr) throw new Error('Missing newScheduledCleaningTimeUTC');\nconst start = new Date(startStr);\nif (Number.isNaN(start.getTime())) throw new Error('Invalid newScheduledCleaningTimeUTC');\nconst end = new Date(start.getTime() + 3 * 60 * 60 * 1000);\nconst startTime = start.toISOString();\nconst endTime = end.toISOString();\nconst adminCalendarEventId = (job.adminCalendarEventId || '').toString().trim();\nconst cleanerCalendarEventId = (job.calendarEventId || '').toString().trim();\nconst calendarId = (job.calendarId || '').toString().trim();\nreturn [{ json: { startTime, endTime, adminCalendarEventId, calendarEventId: cleanerCalendarEventId, calendarId } }];"
+      },
+      "id": "e1744fc6-11e2-41c7-9196-8d2cf4c4a044",
+      "name": "Calculate New Cleaning Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "usman2acountf@gmail.com",
+          "mode": "id"
+        },
+        "eventId": "={{ $json.adminCalendarEventId }}",
+        "updateFields": {}
+      },
+      "id": "8e02f817-69f8-49b9-8fae-4af266e18dcd",
+      "name": "Update Admin Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        -128
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "zieubUQMxpWLThGP",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Calculate New Cleaning Window').item.json.calendarId }}",
+          "mode": "id"
+        },
+        "eventId": "={{ $('Calculate New Cleaning Window').item.json.calendarEventId }}",
+        "updateFields": {}
+      },
+      "id": "5f76b5b9-72be-487f-88b2-d60e77c5dc2a",
+      "name": "Update Cleaner Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [
+        1152,
+        -128
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "zieubUQMxpWLThGP",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CleanersProfile",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "cleanerId",
+              "lookupValue": "={{ $('Lookup Cleaning Job').item.json.cleanerId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7e2d0a75-5cae-44f6-964a-49b9855ba671",
+      "name": "Lookup Cleaner Email",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1376,
+        -128
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Receive Extended Checkout Payload').item.json.body || {};\nconst job = $('Lookup Cleaning Job').item.json || {};\nconst profile = $('Lookup Cleaner Email').item.json || {};\nconst cleanerEmail = (profile['email'] || profile['cleanerEmail'] || '').toString().trim();\nconst calendarEventId = (job.calendarEventId || '').toString().trim();\nconst propertyName = (job.propertyName || job.propertyUid || '').toString().trim();\nconst bookingUid = (body.bookingUid || '').toString().trim();\nconst newCleaningDate = (body.newCleaningDate || '').toString().trim();\nconst newCleaningTime = (body.newCleaningTime || '').toString().trim();\nconst newCheckoutTimeUTC = (body.newCheckoutTimeUTC || '').toString().trim();\nconst calendarLink = calendarEventId\n  ? 'https://calendar.google.com/calendar/r/eventedit/' + calendarEventId\n  : '';\nconst subject = 'Updated Cleaning Schedule – ' + propertyName;\nconst bodyText = `Hi,\\n\\nPlease note that the checkout date for your assigned cleaning has been updated.\\n\\nProperty: ${propertyName}\\nBooking Reference: ${bookingUid}\\nNew Cleaning Date: ${newCleaningDate}\\nNew Cleaning Start Time: ${newCleaningTime} UTC\\n\\nYour calendar event has been updated automatically.\\n\\nPlease do not reply to this email. Contact your manager if you have questions.`;\nreturn [{ json: { toEmail: cleanerEmail, subject, body: bodyText } }];"
+      },
+      "id": "970d56f7-c69a-408a-8e4d-e7f98cea0189",
+      "name": "Prepare Reassignment Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.toEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "7b7f1d7c-c12b-4d27-aa90-d79b9389bc65",
+      "name": "Send Reassignment Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1824,
+        -128
+      ],
+      "webhookId": "c5e793cd-dc38-4d14-8ed0-e0b6dc3bb1ed",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6sr232YN6z3c4tiW",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $('Receive Extended Checkout Payload').item.json.body.bookingUid }}",
+            "checkOut": "={{ $('Receive Extended Checkout Payload').item.json.body.newCheckOut }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "guestName",
+              "displayName": "guestName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkIn",
+              "displayName": "checkIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkOut",
+              "displayName": "checkOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "adultCount",
+              "displayName": "adultCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdUtc",
+              "displayName": "createdUtc",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningStatus",
+              "displayName": "cleaningStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "childrenCount",
+              "displayName": "childrenCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "maintenanceStatus",
+              "displayName": "maintenanceStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payrollStatus",
+              "displayName": "payrollStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d6ebddd0-fa56-4b7d-8e55-4fb6a0a037f1",
+      "name": "Update Reservation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2048,
+        -48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reservations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $('Receive Extended Checkout Payload').item.json.body.bookingUid }}",
+            "checkOut": "={{ $('Receive Extended Checkout Payload').item.json.body.newCheckOut }}",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "guestName",
+              "displayName": "guestName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkIn",
+              "displayName": "checkIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkOut",
+              "displayName": "checkOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "adultCount",
+              "displayName": "adultCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdUtc",
+              "displayName": "createdUtc",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningStatus",
+              "displayName": "cleaningStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "childrenCount",
+              "displayName": "childrenCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "maintenanceStatus",
+              "displayName": "maintenanceStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payrollStatus",
+              "displayName": "payrollStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "013df544-c1f0-4432-8fb9-0e3f35d6e199",
+      "name": "Update Reservation Only",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2048,
+        352
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Receive Extended Checkout Payload').item.json.body || {};\nconst job  = $('Lookup Cleaning Job').item.json || {};\n\n// Old values captured from lookup BEFORE any update ran\nconst oldCheckoutUTC     = (job.checkoutTimeUTC          || '').toString().trim();\nconst oldCleaningTimeUTC = (job.scheduledCleaningTimeUTC || '').toString().trim();\nconst jobStatusAtUpdate  = (job.status                   || '').toString().trim();\nconst calendarEventId    = (job.calendarEventId          || '').toString().trim();\nconst cleanerId          = (job.cleanerId                || '').toString().trim();\n\nconst extensionId = (body.bookingUid || '') + '_EXT_' + Date.now();\n\nreturn [{ json: {\n  extensionId,\n  bookingUid:          body.bookingUid                   || '',\n  propertyUid:         body.propertyUid                  || '',\n  oldCheckoutUTC,\n  newCheckoutUTC:      body.newCheckoutTimeUTC           || '',\n  oldCleaningTimeUTC,\n  newCleaningTimeUTC:  body.newScheduledCleaningTimeUTC  || '',\n  detectedAtUTC:       new Date().toISOString(),\n  jobStatusAtUpdate,\n  calendarEventId,\n  cleanerId\n} }];"
+      },
+      "id": "b2a56399-8988-432c-9f38-7da3aed62f34",
+      "name": "Prepare Log Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g",
+          "mode": "list",
+          "cachedResultName": "hostfully",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "ExtendedCheckouts",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "extensionId": "={{ $json.extensionId }}",
+            "bookingUid": "={{ $json.bookingUid }}",
+            "propertyUid": "={{ $json.propertyUid }}",
+            "oldCheckoutUTC": "={{ $json.oldCheckoutUTC }}",
+            "newCheckoutUTC": "={{ $json.newCheckoutUTC }}",
+            "oldCleaningTimeUTC": "={{ $json.oldCleaningTimeUTC }}",
+            "newCleaningTimeUTC": "={{ $json.newCleaningTimeUTC }}",
+            "detectedAtUTC": "={{ $json.detectedAtUTC }}",
+            "jobStatusAtUpdate": "={{ $json.jobStatusAtUpdate }}",
+            "calendarEventId": "={{ $json.calendarEventId }}",
+            "cleanerId": "={{ $json.cleanerId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "extensionId",
+              "displayName": "extensionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "oldCheckoutUTC",
+              "displayName": "oldCheckoutUTC",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "newCheckoutUTC",
+              "displayName": "newCheckoutUTC",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "oldCleaningTimeUTC",
+              "displayName": "oldCleaningTimeUTC",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "newCleaningTimeUTC",
+              "displayName": "newCleaningTimeUTC",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detectedAtUTC",
+              "displayName": "detectedAtUTC",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "jobStatusAtUpdate",
+              "displayName": "jobStatusAtUpdate",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendarEventId",
+              "displayName": "calendarEventId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerId",
+              "displayName": "cleanerId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "40535dc8-8495-4290-b8fb-5ffaa86cdfc7",
+      "name": "Log to ExtendedCheckouts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2496,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Extended Checkout Payload": {
+      "main": [
+        [
+          {
+            "node": "Lookup Cleaning Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Cleaning Job": {
+      "main": [
+        [
+          {
+            "node": "Prepare Job Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Job Found": {
+      "main": [
+        [
+          {
+            "node": "Job Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job Found?": {
+      "main": [
+        [
+          {
+            "node": "Route by Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Reservation Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Job Status": {
+      "main": [
+        [
+          {
+            "node": "Update CleaningJob PENDING",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update CleaningJob ASSIGNED",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip (Job Active or Completed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CleaningJob PENDING": {
+      "main": [
+        [
+          {
+            "node": "Update Reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CleaningJob ASSIGNED": {
+      "main": [
+        [
+          {
+            "node": "Calculate New Cleaning Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate New Cleaning Window": {
+      "main": [
+        [
+          {
+            "node": "Update Admin Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Admin Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Update Cleaner Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Cleaner Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Lookup Cleaner Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Cleaner Email": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reassignment Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reassignment Email": {
+      "main": [
+        [
+          {
+            "node": "Send Reassignment Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reassignment Email": {
+      "main": [
+        [
+          {
+            "node": "Update Reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reservation": {
+      "main": [
+        [
+          {
+            "node": "Prepare Log Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reservation Only": {
+      "main": [
+        [
+          {
+            "node": "Prepare Log Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Log Row": {
+      "main": [
+        [
+          {
+            "node": "Log to ExtendedCheckouts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "1194b2f6-f56c-4416-8f9c-5938228e6f00",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "id": "NZNbIHz9Qutwj1fa",
+  "tags": []
+}

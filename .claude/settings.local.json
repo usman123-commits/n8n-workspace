@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__gdrive-sheets__getGoogleSheetContent",
+      "mcp__gdrive-sheets__listSheets",
+      "mcp__gdrive-sheets__renameSheet",
+      "mcp__gdrive-sheets__addSheet",
+      "mcp__gdrive-sheets__updateGoogleSheet"
+    ]
+  }
+}
