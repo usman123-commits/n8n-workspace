@@ -2,14 +2,14 @@
 
 We do NOT touch cleaners, payroll, maintenance yet.
 Google Sheets is now the official system of record.
-There are only 5 property UIDs discovered yet:
+There are 6 property UIDs discovered so far:
 
 - `29ce8c43-0368-4934-bce2-e5f7c54d2091`
 - `080afa02-ef01-4038-9528-3c10f88a7645`
 - `33f964cf-2531-47f8-8133-fd501e9f6814`
 - `6301ad7e-6d32-426a-8aef-daa74978f911`
 - `2e49d012-dcf1-43ef-8ce3-566f2364352d`
-  996b0202-6422-45f0-9244-c4060afb8035
+- `996b0202-6422-45f0-9244-c4060afb8035`
 
 First we define:
 What should happen the moment a new confirmed booking is detected?
@@ -194,7 +194,7 @@ Cleaner opens Google Form link.
 - Workflow 3 listens to new rows in `Form Responses 1`, uses **Split In Batches** (batch size 1) to process each new submission one-by-one, validates required fields, extracts lat/lng, and appends a normalized row into `ClockInSubmissions` with `processingStatus = PENDING` (duplicate protection: no insert if that booking already has an APPROVED row).
 - Workflow 3B polls `ClockInSubmissions` and processes **all** `PENDING` rows in each run (each item flows through Get Booking and validation; no extra loop needed):
   - Validates the cleaner is assigned to the booking (by comparing submission `cleanerId` with the assigned `cleanerId` in `CleaningJobs` for the same `bookingUid`).
-  - Validates GPS radius (≤ 100m) using property coordinates from **CleanersProfile** (lookup by `cleanerId`; sheet must have columns **`latitude`** and **`longitude`**).
+  - Validates GPS radius (≤ 100m) using property coordinates from the **Properties** tab (lookup by `propertyUid`; sheet must have columns **`latitude`** and **`longitude`**).
   - If approved:
     - Updates `ClockInSubmissions.processingStatus = APPROVED`, sets `processedAt`.
     - Updates **CleaningJobs**: `status = IN_PROGRESS`, `clockInTimeUTC`, `gpsClockInLat`, `gpsClockInLng`, `gpsStatus = INSIDE_RADIUS`.
