@@ -5,7 +5,9 @@
       "mcp__gdrive-sheets__listSheets",
       "mcp__gdrive-sheets__renameSheet",
       "mcp__gdrive-sheets__addSheet",
-      "mcp__gdrive-sheets__updateGoogleSheet"
+      "mcp__gdrive-sheets__updateGoogleSheet",
+      "Bash(python3:*)",
+      "mcp__gdrive-sheets__deleteCalendarEvent"
     ]
   }
 }

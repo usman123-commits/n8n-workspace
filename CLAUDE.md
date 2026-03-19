@@ -207,20 +207,47 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 
 ## Google Sheets — Main Data Source
 
-**Spreadsheet ID:** `12q_ZZJEkE6xQGJH0XxwCFlt821lpEBgCjLkfm0GmX-g`
+**Spreadsheet ID (V2):** `1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw`
 
-**Sheet Tabs:**
-| Tab Name | Purpose |
-|----------|---------|
-| `Raw Form Responses` | Incoming form data |
-| `timeStamps` | Clock-in/out records |
-| `Reservations` | Booking data |
-| `CleaningJobs` | Cleaning assignments |
-| `ClockInSubmissions` | Validated clock-in records |
-| `ExtendedCheckouts` | Extended checkout records |
-| `CleanersProfile` | Cleaner info |
-| `CancelledBookings` | Cancellation records |
-| `Properties` | Property data |
+### ⚠️ Critical: Always Use Sheet IDs, Never Sheet Names
+
+When configuring Google Sheets nodes in n8n, **always use the numeric sheet ID** (gid),
+never the tab name string. Using names causes failures when n8n can't resolve them.
+
+This applies to **both** the `documentId` (spreadsheet) and `sheetName` (tab) fields.
+
+For `documentId`, use `"mode": "id"` with the spreadsheet ID:
+```json
+"documentId": {
+  "__rl": true,
+  "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+  "mode": "id"
+}
+```
+
+For `sheetName`, use `"mode": "id"` with the numeric gid:
+```json
+"sheetName": {
+  "__rl": true,
+  "value": "2047086003",
+  "mode": "id"
+}
+```
+**Never use `"mode": "name"` or `"mode": "list"`** — they are unreliable and will break.
+
+### Sheet Tab IDs (V2 Spreadsheet)
+
+| Tab Name | Sheet ID (gid) | Purpose |
+|----------|----------------|---------|
+| `Raw Form Responses` | `0` | Incoming form data |
+| `timeStamps` | `1265548981` | Clock-in/out records |
+| `Reservations` | `569949670` | Booking data |
+| `CleaningJobs` | `2047086003` | Cleaning assignments |
+| `ClockInSubmissions` | `1402437116` | Validated clock-in records |
+| `ExtendedCheckouts` | `1082018038` | Extended checkout records |
+| `CleanersProfile` | `1920390373` | Cleaner info |
+| `CancelledBookings` | `1881509778` | Cancellation records |
+| `Properties` | `766791868` | Property data |
 
 When verifying workflow output, always read the relevant tab directly using MCP tools.
 Use the Spreadsheet ID above — do not ask the human for it.
