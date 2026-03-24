@@ -22,7 +22,15 @@ This is the primary ingestion workflow. It polls the Hostfully API for new confi
 
 4. **Derives Cleaning Job** — Immediately creates a corresponding row in the **CleaningJobs** tab with: `bookingUid`, `propertyUid`, `cleaningDate`, `cleaningTime`, `checkoutTimeUTC`, `scheduledCleaningTimeUTC`, `durationHours = 3`, `status = "PENDING"`, and empty fields for `cleanerId`, `assignedAt`, `calendarEventId`, `clockInTimeUTC`.
 
-5. **Extended Checkout Detection** — If a reservation already exists in the sheet and the checkout time in Hostfully differs from the stored value, instead of updating directly, it triggers **Workflow 1A (Extended Checkout Handler)** via webhook with `bookingUid`, `propertyId`, `cleanerId`, `oldCheckout`, `newCheckout`.
+5. **Extended Checkout Detection** — After new bookings are processed, a separate branch identifies potential extended checkouts. A booking is a candidate if it was **created before** the stored timestamp (already in the sheet) but **updated after** it (recently changed in Hostfully). The candidate list is then cross-checked against the Reservations sheet:
+   - The sheet's stored `checkOut` is compared to Hostfully's new checkout (both converted to UTC)
+   - Only bookings where the **new checkout is strictly later** than the stored one are treated as genuine extensions
+   - False positives (bookings updated for other reasons — guest info, notes, etc.) are filtered out here
+   - Confirmed extensions trigger **Workflow 1A (Extended Checkout Handler)** via webhook
+
+   **Field values passed downstream:**
+   - `newCleaningDate` and `newCleaningTime` are derived from `checkOutLocalDateTime` (local time) — not from the UTC ISO string — so they are consistent with how original cleaning jobs are created
+   - `newCheckoutTimeUTC` and `newScheduledCleaningTimeUTC` are the UTC ISO equivalents, derived from `checkOutZonedDateTime`
 
 6. **Updates Stored Timestamp** — After processing, saves the latest `createdUtcDateTime` so the next poll only picks up newer bookings.
 
