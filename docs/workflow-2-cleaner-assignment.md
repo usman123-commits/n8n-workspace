@@ -22,17 +22,20 @@ Picks up PENDING cleaning jobs created by Workflow 1 and assigns a cleaner, crea
 
 4. **Enriches with Reservation Data** — Looks up the Reservations tab by `bookingUid` to get property name, address, and guest info for the email/calendar.
 
-5. **Assigns Cleaner** — Matches `propertyUid` to `fixedCleanerId` from the Properties tab. Checks the cleaner isn't already booked for an overlapping time window using all CleaningJobs data.
+5. **Assigns Cleaner** — Two paths:
+   - **Fixed assignment:** If the Properties row has a non-empty `fixedCleanerId`, that cleaner is assigned directly. `_isFixedAssignment = true`. Assignment count is NOT incremented.
+   - **Round-robin:** If no fixed cleaner, picks from available cleaners by lowest `assignmentCount` in CleanersProfile (tiebreak: alphabetical `cleanerId`). Checks the selected cleaner has no ASSIGNED job with an overlapping `scheduledCleaningTimeUTC` window.
 
-6. **Handles Unavailability** — If no cleaner is available:
-   - Sets `processingFlag = "NEEDS_MANUAL"` on the job
-   - Sends an admin alert email
+6. **Handles Unavailability** — If no cleaner is available (`_noCleanerAvailable = true`):
+   - Sets `status = NEEDS_MANUAL_ASSIGNMENT` on the CleaningJobs row
+   - Clears `processingFlag`
+   - Sends an admin alert email to the admin with property name, bookingUid, and scheduled time (data pulled directly from Assign Cleaner node output)
 
 7. **Generates Clock-In Link** — Builds a pre-filled Google Form URL with `bookingUid` and `cleanerId` embedded. This is what the cleaner clicks on arrival (Phase 3).
 
 8. **Updates Job Record** — Writes `cleanerId`, `assignedAt`, and `clockInLink` to CleaningJobs.
 
-9. **Increments Assignment Count** — Adds 1 to the cleaner's `assignmentCount` in CleanersProfile for workload tracking.
+9. **Increments Assignment Count** — Adds 1 to the cleaner's `assignmentCount` in CleanersProfile. Fixed assignments skip incrementing. If `_needsReset = true` (current date past `assignmentCountResetDateUTC`), count resets to 0 and a new reset date (first of next month UTC) is written.
 
 10. **Creates Calendar Events** — Creates two Google Calendar events (start = scheduledCleaningTimeUTC, end = start + 3 hours):
     - Admin calendar (master view of all cleanings)
@@ -52,8 +55,8 @@ Picks up PENDING cleaning jobs created by Workflow 1 and assigns a cleaner, crea
 
 | Tab | Operation |
 |-----|-----------|
-| Properties | Read (fixedCleanerId, property name, address) |
-| CleanersProfile | Read (email, calendarId, assignmentCount) + Update (assignmentCount) |
+| Properties | Read (`fixedCleanerId` for fixed assignment, property name, address) |
+| CleanersProfile | Read (`cleanerId`, email, calendarId, assignmentCount) + Update (assignmentCount, assignmentCountResetDateUTC) |
 | CleaningJobs | Read (all rows for availability) + Update (assignment, calendar IDs, status) |
 | Reservations | Read (guest info) + Update (cleaningStatus) |
 
@@ -69,6 +72,19 @@ Picks up PENDING cleaning jobs created by Workflow 1 and assigns a cleaner, crea
 ## Key Design Decisions
 
 - **Row-level locking** via `processingFlag` prevents race conditions between schedule runs
-- **fixedCleanerId** (not round-robin) — each property has a dedicated cleaner
+- **Fixed vs round-robin** — Properties sheet controls assignment mode per property via `fixedCleanerId`; if empty, round-robin by `assignmentCount` kicks in
+- **CleanersProfile uses `cleanerId`** — all lookups and sheet matching use `cleanerId`, not `fixedCleanerId`
+- **Restore node after sheet update** — a `Restore Job Data After Count Update` Code node re-attaches full job data after the Google Sheets update node (which only returns the columns it wrote)
+- **Admin alert uses node reference** — `Send Admin Alert` references `$('Assign Cleaner').item.json` directly so `propertyName`, `bookingUid`, and `scheduledCleaningTimeUTC` are always populated correctly
 - **Calendar is view-only** — cleaners cannot edit events; all changes go through workflows
 - **Clock-in link in email + calendar** — two channels to reach the cleaner
+
+---
+
+## Tested Scenarios
+
+| Test | Expected | Result |
+|------|----------|--------|
+| Normal assignment (cleaner available) | Cleaner assigned, calendar events created, Gmail sent, sheets updated | ✅ Pass |
+| Fixed property assignment (`fixedCleanerId` set) | Fixed cleaner assigned, `_isFixedAssignment=true`, count not incremented | ✅ Pass |
+| No cleaner available (all busy) | `_noCleanerAvailable=true`, status=NEEDS_MANUAL_ASSIGNMENT, admin alert sent with correct property name | ✅ Pass |

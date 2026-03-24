@@ -97,17 +97,16 @@ System polls **CleaningJobs** tab.
 
 ## Step 2.2 – Assign Cleaner (Rule-Based)
 
-**Initial logic:**
-propertyUid → cleanerId mapping
+**Current logic (implemented):**
+
+- **Fixed assignment:** If the property's `fixedCleanerId` in the Properties tab is set, that cleaner is always assigned. `assignmentCount` is not incremented.
+- **Round-robin fallback:** If no fixed cleaner, all cleaners in CleanersProfile are checked for availability. A cleaner is unavailable if they have an existing ASSIGNED job with an overlapping `scheduledCleaningTimeUTC` window. From available cleaners, the one with the lowest `assignmentCount` is selected (tiebreak: alphabetical `cleanerId`).
+- **Reset logic:** If a cleaner's `assignmentCountResetDateUTC` has passed, their count is treated as 0 and reset to 0 on next assignment.
 
 **Future upgrade options:**
 
-- Weekday logic
-- Cleaner workload balancing
-- Availability check
-- Round-robin
-
-For now: static mapping.
+- Weekday-specific cleaner preferences
+- SMS redundancy for assignment notifications
 
 **Update cleaning_job:**
 
