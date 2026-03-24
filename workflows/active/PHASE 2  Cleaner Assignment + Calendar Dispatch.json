@@ -1,11 +1,5 @@
 {
-  "updatedAt": "2026-03-19T10:56:31.299Z",
-  "createdAt": "2026-03-03T14:46:02.390Z",
-  "id": "AU1w579al67hGom7",
-  "name": "PHASE 2 â€“ Cleaner Assignment + Calendar Dispatch",
-  "description": null,
-  "active": false,
-  "isArchived": false,
+  "name": "PHASE 2  Cleaner Assignment + Calendar Dispatch",
   "nodes": [
     {
       "parameters": {
@@ -37,8 +31,7 @@
           "name": "Google Sheets account"
         }
       },
-      "notes": "Tab: CleanersProfile. Columns: property UID, cleaner ID, calendar ID, email, name, contact. Used by Assign Cleaner for lookup.",
-      "executeOnce": true
+      "notes": "Tab: CleanersProfile. Columns: property UID, cleaner ID, calendar ID, email, name, contact. Used by Assign Cleaner for lookup."
     },
     {
       "parameters": {
@@ -198,7 +191,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ASSIGN CLEANER â€” fixed property OR availability-based with round-robin tiebreak\nconst DURATION_HOURS = 3;\nconst item = $input.first().json;\nconst propertyUid = (item.propertyUid ?? '').toString().trim();\n\nconst properties   = Array.isArray(item._properties)      ? item._properties      : [];\nconst cleaners     = Array.isArray(item._cleanersProfile)  ? item._cleanersProfile : [];\nconst allJobs      = Array.isArray(item._allCleaningJobs)  ? item._allCleaningJobs : [];\n\nif (properties.length === 0) throw new Error('No Properties data. Ensure Read Properties ran.');\nif (cleaners.length === 0)   throw new Error('No CleanersProfile data. Ensure Read CleanersProfile ran.');\n\nconst get = (row, ...keys) => {\n  const j = row && (row.json !== undefined ? row.json : row);\n  if (!j || typeof j !== 'object') return '';\n  for (const k of keys) {\n    const v = j[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// â”€â”€ Step 1: find property row â”€â”€\nconst propRow = properties.find(r => get(r, 'propertyUid') === propertyUid);\nif (!propRow) throw new Error(`No Properties row for propertyUid: ${propertyUid}.`);\n\nconst propertyNameFromSheet = get(propRow, 'propertyName');\nconst fixedCleanerId        = get(propRow, 'fixedCleanerId');\n\n// â”€â”€ Step 2: resolve cleaner â€” fixed or availability â”€â”€\nlet assignedCleanerId;\nlet isFixed = false;\n\nif (fixedCleanerId) {\n  // Fixed assignment â€” bypass availability check\n  assignedCleanerId = fixedCleanerId;\n  isFixed = true;\n} else {\n  // Availability-based assignment\n  const newStart = item.scheduledCleaningTimeUTC ? new Date(item.scheduledCleaningTimeUTC) : null;\n  if (!newStart || isNaN(newStart.getTime())) throw new Error('Missing or invalid scheduledCleaningTimeUTC on job.');\n  const newEnd = new Date(newStart.getTime() + DURATION_HOURS * 3600 * 1000);\n\n  // Collect busy cleaner IDs from ASSIGNED jobs that overlap with new job window\n  const busyCleanerIds = new Set();\n  for (const jobRow of allJobs) {\n    const j = jobRow?.json ?? jobRow;\n    const jStatus    = (j?.status ?? '').toString().trim();\n    const jCleanerId = (j?.cleanerId ?? '').toString().trim();\n    const jBookingUid = (j?.bookingUid ?? '').toString().trim();\n    // Skip: not ASSIGNED, no cleaner, or this is the same job\n    if (jStatus !== 'ASSIGNED') continue;\n    if (!jCleanerId) continue;\n    if (jBookingUid === (item.bookingUid ?? '').toString().trim()) continue;\n    // Skip if missing scheduledCleaningTimeUTC â€” treat as non-blocking\n    const startStr = (j?.scheduledCleaningTimeUTC ?? '').toString().trim();\n    if (!startStr) continue;\n    const existStart = new Date(startStr);\n    if (isNaN(existStart.getTime())) continue;\n    const existEnd = new Date(existStart.getTime() + DURATION_HOURS * 3600 * 1000);\n    // Standard interval overlap: existStart < newEnd AND existEnd > newStart\n    if (existStart < newEnd && existEnd > newStart) {\n      busyCleanerIds.add(jCleanerId);\n    }\n  }\n\n  // Available cleaners = all cleaners minus busy ones\n  const availableCleaners = cleaners.filter(r => {\n    const cId = get(r, 'cleanerId');\n    return cId && !busyCleanerIds.has(cId);\n  });\n\n  if (availableCleaners.length === 0) {\n    // Signal no-cleaner-found â€” handled by downstream IF node\n    return [{ json: { ...item, _noCleanerAvailable: true, propertyName: propertyNameFromSheet || item.propertyName || propertyUid } }];\n  }\n\n  if (availableCleaners.length === 1) {\n    assignedCleanerId = get(availableCleaners[0], 'cleanerId');\n  } else {\n    // Multiple available â€” check reset then pick lowest assignmentCount\n    const now = new Date();\n    // Reset counts if any cleaner's resetDate has passed\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const resetDateStr = (j?.assignmentCountResetDateUTC ?? '').toString().trim();\n      if (resetDateStr) {\n        const resetDate = new Date(resetDateStr);\n        if (!isNaN(resetDate.getTime()) && now >= resetDate) {\n          // Mark for reset â€” actual sheet update done in Increment node\n          if (j) j._needsReset = true;\n        }\n      }\n    }\n    // Pick cleaner with lowest count (treat missing/reset as 0)\n    let best = null;\n    let bestCount = Infinity;\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const needsReset = j?._needsReset === true;\n      const count = needsReset ? 0 : parseInt(j?.assignmentCount ?? '0', 10) || 0;\n      const cId = get(r, 'cleanerId');\n      if (count < bestCount || (count === bestCount && cId < (best?.id ?? 'ï¿¿'))) {\n        bestCount = count;\n        best = { id: cId, needsReset };\n      }\n    }\n    assignedCleanerId = best.id;\n  }\n}\n\n// â”€â”€ Step 3: get cleaner details â”€â”€\nconst cleanerRow = cleaners.find(r => get(r, 'cleanerId') === assignedCleanerId);\nif (!cleanerRow) throw new Error(`No CleanersProfile row for cleanerId: ${assignedCleanerId}.`);\n\nconst email      = get(cleanerRow, 'email');\nconst calendarId = get(cleanerRow, 'calendarId', 'calendar ID');\nconst name       = get(cleanerRow, 'name');\nconst phone      = get(cleanerRow, 'phone');\n\nconst assignedAt = new Date().toISOString();\nconst out = {\n  ...item,\n  cleanerId:         assignedCleanerId,\n  cleanerEmail:      email      || item.cleanerEmail      || '',\n  cleanerCalendarId: calendarId || item.cleanerCalendarId || '',\n  cleanerName:       name       || item.cleanerName       || '',\n  assignedCleaner:   name       || item.assignedCleaner   || '',\n  cleanerContact:    phone      || item.cleanerContact    || '',\n  assignedAt,\n  status: 'ASSIGNED',\n  propertyName: propertyNameFromSheet || item.propertyName || propertyUid,\n  _isFixedAssignment: isFixed,\n  _noCleanerAvailable: false,\n  _needsReset: (() => {\n    if (isFixed) return false;\n    const row = availableCleaners.find(r => get(r, 'cleanerId') === assignedCleanerId);\n    const j = row?.json ?? row;\n    return j?._needsReset === true;\n  })()\n};\ndelete out._properties;\ndelete out._cleanersProfile;\ndelete out._allCleaningJobs;\nreturn [{ json: out }];"
+        "jsCode": "// ASSIGN CLEANER â€” fixed property OR availability-based with round-robin tiebreak\nconst DURATION_HOURS = 3;\nconst item = $input.first().json;\nconst propertyUid = (item.propertyUid ?? '').toString().trim();\n\nconst properties   = Array.isArray(item._properties)      ? item._properties      : [];\nconst cleaners     = Array.isArray(item._cleanersProfile)  ? item._cleanersProfile : [];\nconst allJobs      = Array.isArray(item._allCleaningJobs)  ? item._allCleaningJobs : [];\n\nif (properties.length === 0) throw new Error('No Properties data. Ensure Read Properties ran.');\nif (cleaners.length === 0)   throw new Error('No CleanersProfile data. Ensure Read CleanersProfile ran.');\n\nconst get = (row, ...keys) => {\n  const j = row && (row.json !== undefined ? row.json : row);\n  if (!j || typeof j !== 'object') return '';\n  for (const k of keys) {\n    const v = j[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// â”€â”€ Step 1: find property row â”€â”€\nconst propRow = properties.find(r => get(r, 'propertyUid') === propertyUid);\nif (!propRow) throw new Error(`No Properties row for propertyUid: ${propertyUid}.`);\n\nconst propertyNameFromSheet = get(propRow, 'propertyName');\nconst fixedCleanerId        = get(propRow, 'fixedCleanerId');\n\n// â”€â”€ Step 2: resolve cleaner â€” fixed or availability â”€â”€\nlet assignedCleanerId;\nlet isFixed = false;\n\nif (fixedCleanerId) {\n  // Fixed assignment â€” bypass availability check\n  assignedCleanerId = fixedCleanerId;\n  isFixed = true;\n} else {\n  // Availability-based assignment\n  const newStart = item.scheduledCleaningTimeUTC ? new Date(item.scheduledCleaningTimeUTC) : null;\n  if (!newStart || isNaN(newStart.getTime())) throw new Error('Missing or invalid scheduledCleaningTimeUTC on job.');\n  const newEnd = new Date(newStart.getTime() + DURATION_HOURS * 3600 * 1000);\n\n  // Collect busy cleaner IDs from ASSIGNED jobs that overlap with new job window\n  const busyCleanerIds = new Set();\n  for (const jobRow of allJobs) {\n    const j = jobRow?.json ?? jobRow;\n    const jStatus    = (j?.status ?? '').toString().trim();\n    const jCleanerId = (j?.cleanerId ?? '').toString().trim();\n    const jBookingUid = (j?.bookingUid ?? '').toString().trim();\n    // Skip: not ASSIGNED, no cleaner, or this is the same job\n    if (jStatus !== 'ASSIGNED') continue;\n    if (!jCleanerId) continue;\n    if (jBookingUid === (item.bookingUid ?? '').toString().trim()) continue;\n    // Skip if missing scheduledCleaningTimeUTC â€” treat as non-blocking\n    const startStr = (j?.scheduledCleaningTimeUTC ?? '').toString().trim();\n    if (!startStr) continue;\n    const existStart = new Date(startStr);\n    if (isNaN(existStart.getTime())) continue;\n    const existEnd = new Date(existStart.getTime() + DURATION_HOURS * 3600 * 1000);\n    // Standard interval overlap: existStart < newEnd AND existEnd > newStart\n    if (existStart < newEnd && existEnd > newStart) {\n      busyCleanerIds.add(jCleanerId);\n    }\n  }\n\n  // Available cleaners = all cleaners minus busy ones\n  const availableCleaners = cleaners.filter(r => {\n    const cId = get(r, 'cleanerId');\n    return cId && !busyCleanerIds.has(cId);\n  });\n\n  if (availableCleaners.length === 0) {\n    // Signal no-cleaner-found â€” handled by downstream IF node\n    return [{ json: { ...item, _noCleanerAvailable: true, propertyName: propertyNameFromSheet || item.propertyName || propertyUid } }];\n  }\n\n  if (availableCleaners.length === 1) {\n    assignedCleanerId = get(availableCleaners[0], 'cleanerId');\n  } else {\n    // Multiple available â€” check reset then pick lowest assignmentCount\n    const now = new Date();\n    // Reset counts if any cleaner's resetDate has passed\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const resetDateStr = (j?.assignmentCountResetDateUTC ?? '').toString().trim();\n      if (resetDateStr) {\n        const resetDate = new Date(resetDateStr);\n        if (!isNaN(resetDate.getTime()) && now >= resetDate) {\n          // Mark for reset â€” actual sheet update done in Increment node\n          if (j) j._needsReset = true;\n        }\n      }\n    }\n    // Pick cleaner with lowest count (treat missing/reset as 0)\n    let best = null;\n    let bestCount = Infinity;\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const needsReset = j?._needsReset === true;\n      const count = needsReset ? 0 : parseInt(j?.assignmentCount ?? '0', 10) || 0;\n      const cId = get(r, 'cleanerId');\n      if (count < bestCount || (count === bestCount && cId < (best?.id ?? 'ï¿¿'))) {\n        bestCount = count;\n        best = { id: cId, needsReset };\n      }\n    }\n    assignedCleanerId = best.id;\n  }\n}\n\n// â”€â”€ Step 3: get cleaner details â”€â”€\nconst cleanerRow = cleaners.find(r => get(r, 'cleanerId') === assignedCleanerId);\nif (!cleanerRow) throw new Error(`No CleanersProfile row for cleanerId: ${assignedCleanerId}.`);\n\nconst email      = get(cleanerRow, 'email');\nconst calendarId = get(cleanerRow, 'calendarId', 'calendar ID');\nconst name       = get(cleanerRow, 'name');\nconst phone      = get(cleanerRow, 'phone');\n\nconst assignedAt = new Date().toISOString();\nconst out = {\n  ...item,\n  cleanerId:         assignedCleanerId,\n  cleanerEmail:      email      || item.cleanerEmail      || '',\n  cleanerCalendarId: calendarId || item.cleanerCalendarId || '',\n  cleanerName:       name       || item.cleanerName       || '',\n  assignedCleaner:   name       || item.assignedCleaner   || '',\n  cleanerContact:    phone      || item.cleanerContact    || '',\n  assignedAt,\n  status: 'ASSIGNED',\n  propertyName: propertyNameFromSheet || item.propertyName || propertyUid,\n  _isFixedAssignment: isFixed,\n  _noCleanerAvailable: false\n};\ndelete out._properties;\ndelete out._cleanersProfile;\ndelete out._allCleaningJobs;\nreturn [{ json: out }];"
       },
       "id": "da1b39fb-1408-4e80-b407-d37e762be606",
       "name": "Assign Cleaner",
@@ -1579,7 +1572,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "bookingUid": "={{ $json.bookingUid }}",
-            "cleaningStatus": "ASSIGNED"
+            "cleaningStatus": "= {{ $json.status }}"
           },
           "matchingColumns": [
             "bookingUid"
@@ -1938,9 +1931,9 @@
     {
       "parameters": {
         "sendTo": "usman2acountf@gmail.com",
-        "subject": "={{ 'No Cleaner Available â€“ ' + ($json.propertyName || $json.propertyUid) }}",
+        "subject": "={{ 'No Cleaner Available  - ' + ($('Cleaner Available?').item.json.propertyName ||$('Cleaner Available?').item.json.propertyUid ) }}",
         "emailType": "text",
-        "message": "={{ 'No cleaner is available for the following job:\\n\\nProperty: ' + ($json.propertyName || $json.propertyUid) + '\\nBooking: ' + $json.bookingUid + '\\nScheduled Cleaning: ' + ($json.scheduledCleaningTimeUTC || $json.cleaningDate + ' ' + $json.cleaningTime) + '\\n\\nThe job has been marked as NEEDS_MANUAL_ASSIGNMENT in CleaningJobs. Please assign a cleaner manually.' }}",
+        "message": "=No cleaner is available for the following job\n\nProperty : {{ $('Cleaner Available?').item.json.propertyName ||$('Cleaner Available?').item.json.propertyUid  }}\n\nBooking : {{ $('Cleaner Available?').item.json.bookingUid }}\n\nScheduled Cleaning : {{ $('Cleaner Available?').item.json.scheduledCleaningTimeUTC }}\n\n\nThe job has been marked as NEEDS_MANUAL_ASSIGNMENT in CleaningJobs. Please assign a cleaner manually.\n",
         "options": {}
       },
       "id": "fe55162e-2ffa-42a8-b2a1-035a4b11f419",
@@ -1961,7 +1954,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Increment assignmentCount for the assigned cleaner.\n// Look up current count from CleanersProfile and compute reset date.\nconst item = $input.first().json;\nconst cleanerId = (item.cleanerId ?? '').toString().trim();\nconst now = new Date();\nconst nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));\nconst nextResetISO = nextReset.toISOString();\n\n// Look up current assignmentCount from CleanersProfile\nconst allCleaners = $(\"Read CleanersProfile\").all().map(i => i.json);\nconst profile = allCleaners.find(c => (c.cleanerId ?? '').toString().trim() === cleanerId);\nconst currentCount = parseInt(profile?.assignmentCount ?? '0', 10);\n\nif (item._isFixedAssignment || !cleanerId) {\n  return [{ json: {\n    ...item,\n    _incrementCleanerId: cleanerId,\n    _nextResetISO: nextResetISO,\n    _currentCount: String(currentCount),\n    _needsReset: false\n  } }];\n}\nreturn [{ json: {\n  ...item,\n  _incrementCleanerId: cleanerId,\n  _nextResetISO: nextResetISO,\n  _currentCount: String(currentCount),\n  _needsReset: item._needsReset === true\n} }];"
+        "jsCode": "// Increment assignmentCount for the assigned cleaner.\n// Look up current count from CleanersProfile and compute reset date.\nconst item = $input.first().json;\nconst cleanerId = (item.cleanerId ?? '').toString().trim();\nconst now = new Date();\nconst nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));\nconst nextResetISO = nextReset.toISOString();\n\n// Look up current assignmentCount from CleanersProfile\nconst allCleaners = $(\"Read CleanersProfile\").all().map(i => i.json);\nconst profile = allCleaners.find(c => (c.cleanerId ?? '').toString().trim() === cleanerId);\n\n// Safe count computation — handles empty string, undefined, null, NaN\nconst rawCount = profile?.assignmentCount;\nconst parsedCount = (rawCount !== undefined && rawCount !== null && String(rawCount).trim() !== '') ? parseInt(String(rawCount).trim(), 10) : 0;\nconst safeCount = isNaN(parsedCount) ? 0 : parsedCount;\n\nif (item._isFixedAssignment || !cleanerId) {\n  return [{ json: {\n    ...item,\n    _incrementCleanerId: cleanerId,\n    _nextResetISO: nextResetISO,\n    _currentCount: String(safeCount),\n    _needsReset: false\n  } }];\n}\nreturn [{ json: {\n  ...item,\n  _incrementCleanerId: cleanerId,\n  _nextResetISO: nextResetISO,\n  _currentCount: String(safeCount),\n  _needsReset: item._needsReset === true\n} }];"
       },
       "id": "154a6be4-9400-4916-814e-8fbdbcf0cce0",
       "name": "Increment Assignment Count",
@@ -1991,7 +1984,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "cleanerId": "={{ $json.cleanerId }}",
-            "assignmentCount": "={{ $json._needsReset ? '0' : ($json._isFixedAssignment ? $json._currentCount : String(parseInt($json._currentCount ?? '0', 10) + 1)) }}",
+            "assignmentCount": "={{ $json._isFixedAssignment ? $json._currentCount : String(parseInt($json._currentCount ?? '0', 10) + 1) }}",
             "assignmentCountResetDateUTC": "={{ $json._nextResetISO }}"
           },
           "matchingColumns": [
@@ -2060,6 +2053,7 @@
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Single Item for Read Jobs": {
       "main": [
@@ -2429,6 +2423,7 @@
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
@@ -2437,38 +2432,11 @@
     "timezone": "Asia/Karachi",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "staticData": {
-    "node:Schedule Trigger": {
-      "recurrenceRules": []
-    }
-  },
+  "versionId": "b831a83b-a41f-4234-851d-71badf52fffd",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
   },
-  "pinData": {},
-  "versionId": "ab7a13d5-37e2-44d7-b3fe-eb730b540e6d",
-  "activeVersionId": null,
-  "versionCounter": 168,
-  "triggerCount": 1,
-  "shared": [
-    {
-      "updatedAt": "2026-03-03T14:46:02.393Z",
-      "createdAt": "2026-03-03T14:46:02.393Z",
-      "role": "workflow:owner",
-      "workflowId": "AU1w579al67hGom7",
-      "projectId": "ddeMWJyPLl8PJ11M",
-      "project": {
-        "updatedAt": "2026-02-19T14:48:45.746Z",
-        "createdAt": "2026-02-19T14:47:38.459Z",
-        "id": "ddeMWJyPLl8PJ11M",
-        "name": "Usman Usman <bgmazak123@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "5b528006-fdf4-44ee-a8ed-3561544980f8"
-      }
-    }
-  ],
-  "tags": [],
-  "activeVersion": null
+  "id": "AU1w579al67hGom7",
+  "tags": []
 }

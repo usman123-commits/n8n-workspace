@@ -7,7 +7,30 @@
       "mcp__gdrive-sheets__addSheet",
       "mcp__gdrive-sheets__updateGoogleSheet",
       "Bash(python3:*)",
-      "mcp__gdrive-sheets__deleteCalendarEvent"
+      "mcp__gdrive-sheets__deleteCalendarEvent",
+      "WebSearch",
+      "WebFetch(domain:www.yelp.com)",
+      "WebFetch(domain:www.facebook.com)",
+      "WebFetch(domain:austinbeeclean.com)",
+      "WebFetch(domain:reviews.birdeye.com)",
+      "WebFetch(domain:www.austinbeeclean.com)",
+      "Bash(npm list:*)",
+      "Bash(node -e \"require\\(''''C:/Users/user/AppData/Roaming/npm/node_modules/docx''''\\)\")",
+      "Bash(npm install:*)",
+      "Bash(node build_competitor_doc.js)",
+      "WebFetch(domain:stitch.withgoogle.com)",
+      "WebFetch(domain:www.youtube.com)",
+      "WebFetch(domain:www.gong.io)",
+      "WebFetch(domain:closecrm.io)",
+      "WebFetch(domain:www.saleshacker.com)",
+      "Bash(pandoc \"C:/folderF/Zelvopmaster plan/zelvop_sheets_schema.docx\" -o /tmp/schema_output.md)",
+      "Read(//tmp/**)",
+      "mcp__gdrive-sheets__createGoogleSheet",
+      "mcp__gdrive-sheets__formatGoogleSheetCells",
+      "mcp__gdrive-sheets__addDataValidation",
+      "mcp__gmail__read_email",
+      "mcp__gmail__search_emails",
+      "Bash(dir /b)"
     ]
   }
 }
