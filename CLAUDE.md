@@ -199,6 +199,7 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync | — |
 | `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | — |
 | `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | — |
+| `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) |
 
 > Fill in the Trigger Type column as you work with each workflow (webhook path, schedule, manual).
 > This saves time when deciding how to test each one.

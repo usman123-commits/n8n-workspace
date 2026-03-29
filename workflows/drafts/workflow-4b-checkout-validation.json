@@ -1,0 +1,603 @@
+{
+  "name": "Workflow 4B \u2013 Checkout Validation Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Workflow 4B \u2013 Checkout Validation Processor\n\nPolls CheckoutSubmissions every 1 minute for PENDING rows.\n\n**Validation checks (in order):**\n1. Cleaner match \u2014 cleanerIdFromForm must equal fixedCleanerId in CleaningJobs\n2. Clock-in exists \u2014 job status must be IN_PROGRESS\n3. Duration minimum \u2014 checkout must be \u2265 30 min after clock-in\n4. Duration maximum \u2014 checkout must be \u2264 6 hours after clock-in\n5. GPS radius \u2014 cleaner must be within 100m of property\n\n**On APPROVED:**\n- CheckoutSubmissions: processingStatus = APPROVED\n- CleaningJobs: status = COMPLETED, clockOutTimeUTC, gpsClockOut fields\n- Reservations: cleaningStatus = COMPLETED\n\n**On REJECTED:**\n- CheckoutSubmissions: processingStatus = REJECTED with reason\n- No other sheets updated\n\n**NOTE:** CheckoutSubmissions tab uses mode:name (update to gid once tab is created).",
+        "height": 380,
+        "width": 420,
+        "color": 5
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1420, 560]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000002",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1200, 864],
+      "notes": "Runs every 1 minute.\nWhy: polls for new PENDING checkout submissions to validate.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CheckoutSubmissions",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000003",
+      "name": "Read CheckoutSubmissions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [-976, 864],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Reads all rows from CheckoutSubmissions.\nWhy: next node filters to PENDING only.\nTODO: update sheetName to mode:id with gid once tab is created.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only continue if processingStatus = PENDING.\nconst items = $input.all();\nconst pending = items.filter(i => (i.json?.processingStatus ?? '').toString().trim() === 'PENDING');\nreturn pending.length ? pending : [];"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000004",
+      "name": "Only PENDING",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-752, 864],
+      "notes": "Keeps only rows where processingStatus=PENDING.\nWhy: already-processed rows (APPROVED/REJECTED) must not be re-validated.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "2047086003",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000005",
+      "name": "Get Booking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [-528, 864],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Looks up the CleaningJobs row by bookingUid.\nWhy: need fixedCleanerId, status, clockInTimeUTC, and propertyUid to validate against.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge each submission (from Only PENDING) with its CleaningJobs row (Get Booking), by position.\nconst pendingItems = $('Only PENDING').all();\nconst jobItems = $input.all();\nreturn jobItems.map((jobItem, i) => {\n  const submission = pendingItems[i]?.json || {};\n  const job = jobItem.json || {};\n  return { json: { ...submission, ...job } };\n});"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000006",
+      "name": "Merge Submission and Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-304, 864],
+      "notes": "Combines the checkout submission data with the CleaningJobs data by position index.\nWhy: validation needs both the form submission and the job details in one object.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run all pre-GPS validations: cleaner match, clock-in status, duration min/max.\nconst items = $input.all();\nreturn items.map(item => {\n  const j = item.json || {};\n\n  // 1. Cleaner match\n  const cleanerFromForm = (j.cleanerIdFromForm ?? '').toString().trim();\n  const assignedCleaner = (j.fixedCleanerId ?? '').toString().trim();\n  if (!cleanerFromForm || !assignedCleaner || cleanerFromForm !== assignedCleaner) {\n    return { json: { ...j, validationPass: 'FAIL', validationMsg: 'Cleaner not assigned to this booking' } };\n  }\n\n  // 2. Clock-in exists — job must be IN_PROGRESS\n  const jobStatus = (j.status ?? '').toString().trim();\n  if (jobStatus !== 'IN_PROGRESS') {\n    return { json: { ...j, validationPass: 'FAIL', validationMsg: 'No approved clock-in found' } };\n  }\n\n  // 3. Duration checks\n  const clockInTime = j.clockInTimeUTC ? new Date(j.clockInTimeUTC) : null;\n  const checkoutTime = j.submissionTimestamp ? new Date(j.submissionTimestamp) : null;\n\n  if (!clockInTime || isNaN(clockInTime.getTime()) || !checkoutTime || isNaN(checkoutTime.getTime())) {\n    return { json: { ...j, validationPass: 'FAIL', validationMsg: 'Invalid timestamp — cannot calculate duration' } };\n  }\n\n  const durationMs = checkoutTime.getTime() - clockInTime.getTime();\n  const durationMin = Math.round(durationMs / 60000);\n\n  if (durationMin < 30) {\n    return { json: { ...j, validationPass: 'FAIL', validationMsg: 'Checkout too soon (' + durationMin + ' min after clock-in)', durationMinutes: durationMin } };\n  }\n\n  if (durationMin > 360) {\n    const durationHrs = (durationMin / 60).toFixed(1);\n    return { json: { ...j, validationPass: 'FAIL', validationMsg: 'Checkout too late (' + durationHrs + ' hrs after clock-in)', durationMinutes: durationMin } };\n  }\n\n  return { json: { ...j, validationPass: 'PASS', validationMsg: 'Pre-GPS checks passed', durationMinutes: durationMin } };\n});"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000007",
+      "name": "Validate Pre-GPS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 864],
+      "notes": "Checks: cleaner match, clock-in status IN_PROGRESS, duration 30min–6hrs.\nAdds validationPass (PASS/FAIL) and validationMsg to each item.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "pre-gps-pass",
+              "leftValue": "={{ $json.validationPass }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000008",
+      "name": "Pre-GPS Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [144, 864],
+      "notes": "TRUE = cleaner/status/duration checks passed → proceed to GPS.\nFALSE = failed → reject with reason from validationMsg.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CheckoutSubmissions",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "processingStatus": "REJECTED",
+            "resultMessage": "={{ $json.validationMsg }}",
+            "processedAt": "={{ $now.toISO() }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {"id": "bookingUid", "displayName": "bookingUid", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "cleanerIdFromForm", "displayName": "cleanerIdFromForm", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "gpsLat", "displayName": "gpsLat", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "gpsLng", "displayName": "gpsLng", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "submissionTimestamp", "displayName": "submissionTimestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "processingStatus", "displayName": "processingStatus", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "resultMessage", "displayName": "resultMessage", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "processedAt", "displayName": "processedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true, "removed": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000009",
+      "name": "Reject Pre-GPS",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [368, 672],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets processingStatus=REJECTED with the reason from validationMsg.\nCovers: wrong cleaner, no clock-in, too soon, too late.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through TRUE-branch items so Merge Coords can reference them reliably.\nreturn $input.all();"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000010",
+      "name": "Pass Validated Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [368, 864],
+      "notes": "Stores items that passed pre-GPS validation for reference in Merge Coords.\nWhy: Get Property Coordinates replaces item data — we need to re-merge later.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "766791868",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "propertyUid",
+              "lookupValue": "={{ $json.propertyUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000011",
+      "name": "Get Property Coordinates",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [368, 1056],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Looks up latitude/longitude from the Properties tab by propertyUid.\nWhy: compare the cleaner's GPS against the property location for radius check.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine by position: validated submission (Pass Validated Items) with coords (Get Property Coordinates).\nconst submissionItems = $('Pass Validated Items').all();\nconst coordsItems = $input.all();\nconst len = Math.min(submissionItems.length, coordsItems.length);\nif (len === 0) return [];\nconst out = [];\nfor (let i = 0; i < len; i++) {\n  const sub = submissionItems[i]?.json || {};\n  const coord = coordsItems[i]?.json || {};\n  out.push({ json: { ...sub, ...coord } });\n}\nreturn out;"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000012",
+      "name": "Merge Coords with Submission",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [816, 1056],
+      "notes": "Re-merges the validated submission data with property coordinates by position.\nWhy: distance calculation needs both GPS points in one object.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Haversine distance in meters between cleaner GPS and property GPS.\nconst items = $input.all();\nconst R = 6371000;\nconst toRad = deg => deg * (Math.PI / 180);\nreturn items.map(item => {\n  const j = item.json || {};\n  const userLat = parseFloat(j.gpsLat);\n  const userLng = parseFloat(j.gpsLng);\n  const propertyLat = parseFloat(j.latitude);\n  const propertyLng = parseFloat(j.longitude);\n  let distance = NaN;\n  if (Number.isFinite(userLat) && Number.isFinite(userLng) && Number.isFinite(propertyLat) && Number.isFinite(propertyLng)) {\n    const dLat = toRad(propertyLat - userLat);\n    const dLng = toRad(propertyLng - userLng);\n    const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toRad(userLat))*Math.cos(toRad(propertyLat))*Math.sin(dLng/2)*Math.sin(dLng/2);\n    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n    distance = R * c;\n  }\n  return { json: { ...j, distance: Number.isFinite(distance) ? Math.round(distance) : 999999 } };\n});"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000013",
+      "name": "Distance Calculation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 1056],
+      "notes": "Haversine formula: calculates meters between cleaner GPS and property GPS.\nAdds distance (rounded meters) to each item. Defaults to 999999 if coords invalid.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "inside-radius",
+              "leftValue": "={{ $json.distance }}",
+              "rightValue": 100,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000014",
+      "name": "Radius Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1264, 1056],
+      "notes": "TRUE = within 100m → approve.\nFALSE = too far → reject with distance.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CheckoutSubmissions",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "processingStatus": "REJECTED",
+            "resultMessage": "={{ 'Outside property radius (' + $json.distance + 'm away)' }}",
+            "processedAt": "={{ $now.toISO() }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {"id": "bookingUid", "displayName": "bookingUid", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "cleanerIdFromForm", "displayName": "cleanerIdFromForm", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "gpsLat", "displayName": "gpsLat", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "gpsLng", "displayName": "gpsLng", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "submissionTimestamp", "displayName": "submissionTimestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "processingStatus", "displayName": "processingStatus", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "resultMessage", "displayName": "resultMessage", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "processedAt", "displayName": "processedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true, "removed": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000015",
+      "name": "Reject GPS Outside",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1488, 1248],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets processingStatus=REJECTED with distance in metres.\nCleaner can retry by submitting the form again.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CheckoutSubmissions",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "processingStatus": "APPROVED",
+            "resultMessage": "Checkout successful",
+            "processedAt": "={{ $now.toISO() }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {"id": "bookingUid", "displayName": "bookingUid", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "cleanerIdFromForm", "displayName": "cleanerIdFromForm", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "gpsLat", "displayName": "gpsLat", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "gpsLng", "displayName": "gpsLng", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "submissionTimestamp", "displayName": "submissionTimestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "processingStatus", "displayName": "processingStatus", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "resultMessage", "displayName": "resultMessage", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "processedAt", "displayName": "processedAt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true, "removed": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000016",
+      "name": "Update CheckoutSubmissions APPROVED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1488, 864],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets processingStatus=APPROVED and resultMessage in CheckoutSubmissions.\nWhy: marks this submission as validated and accepted.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "2047086003",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "status": "COMPLETED",
+            "clockOutTimeUTC": "={{ $json.submissionTimestamp }}",
+            "gpsClockOutLat": "={{ $json.gpsLat }}",
+            "gpsClockOutLng": "={{ $json.gpsLng }}",
+            "gpsClockOutStatus": "INSIDE_RADIUS",
+            "row_number": 0
+          },
+          "matchingColumns": ["bookingUid"],
+          "schema": [
+            {"id": "bookingUid", "displayName": "bookingUid", "required": false, "defaultMatch": true, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "status", "displayName": "status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "clockOutTimeUTC", "displayName": "clockOutTimeUTC", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "gpsClockOutLat", "displayName": "gpsClockOutLat", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "gpsClockOutLng", "displayName": "gpsClockOutLng", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "gpsClockOutStatus", "displayName": "gpsClockOutStatus", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000017",
+      "name": "Update CleaningJobs COMPLETED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1712, 864],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets CleaningJobs status=COMPLETED and writes clockOutTimeUTC + GPS out fields.\nWhy: marks job done so Workflow 5 (payroll) can pick it up.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleaningStatus": "COMPLETED",
+            "row_number": 0
+          },
+          "matchingColumns": ["bookingUid"],
+          "schema": [
+            {"id": "bookingUid", "displayName": "bookingUid", "required": false, "defaultMatch": true, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "cleaningStatus", "displayName": "cleaningStatus", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000018",
+      "name": "Update Reservations COMPLETED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1936, 864],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets Reservations cleaningStatus=COMPLETED by bookingUid.\nWhy: external systems read cleaningStatus from Reservations tab.",
+      "notesInFlow": false
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [{"node": "Read CheckoutSubmissions", "type": "main", "index": 0}]
+      ]
+    },
+    "Read CheckoutSubmissions": {
+      "main": [
+        [{"node": "Only PENDING", "type": "main", "index": 0}]
+      ]
+    },
+    "Only PENDING": {
+      "main": [
+        [{"node": "Get Booking", "type": "main", "index": 0}]
+      ]
+    },
+    "Get Booking": {
+      "main": [
+        [{"node": "Merge Submission and Job", "type": "main", "index": 0}]
+      ]
+    },
+    "Merge Submission and Job": {
+      "main": [
+        [{"node": "Validate Pre-GPS", "type": "main", "index": 0}]
+      ]
+    },
+    "Validate Pre-GPS": {
+      "main": [
+        [{"node": "Pre-GPS Check", "type": "main", "index": 0}]
+      ]
+    },
+    "Pre-GPS Check": {
+      "main": [
+        [
+          {"node": "Pass Validated Items", "type": "main", "index": 0},
+          {"node": "Get Property Coordinates", "type": "main", "index": 0}
+        ],
+        [{"node": "Reject Pre-GPS", "type": "main", "index": 0}]
+      ]
+    },
+    "Get Property Coordinates": {
+      "main": [
+        [{"node": "Merge Coords with Submission", "type": "main", "index": 0}]
+      ]
+    },
+    "Merge Coords with Submission": {
+      "main": [
+        [{"node": "Distance Calculation", "type": "main", "index": 0}]
+      ]
+    },
+    "Distance Calculation": {
+      "main": [
+        [{"node": "Radius Check", "type": "main", "index": 0}]
+      ]
+    },
+    "Radius Check": {
+      "main": [
+        [{"node": "Update CheckoutSubmissions APPROVED", "type": "main", "index": 0}],
+        [{"node": "Reject GPS Outside", "type": "main", "index": 0}]
+      ]
+    },
+    "Update CheckoutSubmissions APPROVED": {
+      "main": [
+        [{"node": "Update CleaningJobs COMPLETED", "type": "main", "index": 0}]
+      ]
+    },
+    "Update CleaningJobs COMPLETED": {
+      "main": [
+        [{"node": "Update Reservations COMPLETED", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
