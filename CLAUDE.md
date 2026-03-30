@@ -1,8 +1,11 @@
-# CLAUDE.md — n8n Workflow Automation Project
+# CLAUDE.md — n8n Workflow Automation Workspace
 
-You are the **engineering partner** for this n8n automation project.
+You are the **engineering partner** for this n8n automation workspace.
 The human acts as **architect** — they define what workflows should do.
 You handle: writing workflow JSON, pushing to n8n, running tests, reading results, fixing bugs, and iterating.
+
+**This workspace contains multiple projects.** Each project has its own subdirectory under `workflows/` and `docs/`.
+When working on a project, read its project-specific docs for full context.
 
 ---
 
@@ -30,18 +33,25 @@ You handle: writing workflow JSON, pushing to n8n, running tests, reading result
 
 ```
 n8n-workspace/
-├── CLAUDE.md                  ← you are here
+├── CLAUDE.md                  ← you are here (shared rules + project index)
 ├── .mcp.json                  ← MCP server config (never commit)
 ├── .env                       ← N8N_API_KEY (never commit)
 ├── .gitignore
 ├── gcp-oauth.keys.json        ← Google Cloud OAuth credentials (never commit)
 ├── workflows/
-│   ├── active/                ← production-ready workflows
-│   └── drafts/                ← work in progress
+│   ├── active/
+│   │   ├── cleaning/          ← cleaning operations workflows
+│   │   └── cold-email/        ← cold email workflows
+│   └── drafts/
+│       ├── cleaning/
+│       └── cold-email/
 ├── tests/
-│   └── payloads/              ← sample JSON payloads for webhook testing
+│   └── payloads/
+│       ├── cleaning/
+│       └── cold-email/
 └── docs/
-    └── credentials.md         ← credential names used in n8n (no secrets)
+    ├── cleaning/              ← cleaning project docs & plans
+    └── cold-email/            ← cold email project docs & plans
 ```
 
 ---
@@ -189,6 +199,17 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 
 ---
 
+## Projects Index
+
+| Project | Folder | Status | Docs |
+|---------|--------|--------|------|
+| **Cleaning Operations** | `cleaning/` | Active (7 workflows) | `docs/cleaning/` |
+| **Cold Email** | `cold-email/` | New | `docs/cold-email/` |
+
+---
+
+# PROJECT 1: CLEANING OPERATIONS
+
 ## Workflows & Their IDs
 
 | ID | Workflow Name | Trigger Type |
@@ -200,9 +221,6 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | — |
 | `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | — |
 | `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) |
-
-> Fill in the Trigger Type column as you work with each workflow (webhook path, schedule, manual).
-> This saves time when deciding how to test each one.
 
 ---
 
@@ -468,3 +486,39 @@ python3 strip_workflow.py workflows/active/my-workflow.json | \
 - `assignmentCountResetDate` — date when assignmentCount was last reset
 
 > Any workflow node or expression referencing `cleanerId` is a bug — change to `fixedCleanerId`.
+
+---
+
+# PROJECT 2: COLD EMAIL AUTOMATION
+
+## Overview
+
+Automated cold email outreach system built with n8n workflows.
+Full docs: `docs/cold-email/`
+
+## Workflows & Their IDs
+
+| ID | Workflow Name | Trigger Type |
+|----|--------------|--------------|
+| — | (to be created) | — |
+
+## Google Sheets — Cold Email Data
+
+**Spreadsheet ID:** _(to be created)_
+
+| Tab Name | Sheet ID (gid) | Purpose |
+|----------|----------------|---------|
+| — | — | — |
+
+> Same rules apply: always use `mode: "id"` for both documentId and sheetName.
+
+## Forms
+
+| Form | Form ID | Purpose |
+|------|---------|---------|
+| — | — | — |
+
+## Credential Names
+
+Uses the same n8n credentials as Cleaning Operations (Gmail, Google Sheets, etc.).
+Additional credentials will be added here as needed (e.g., email verification APIs, lead databases).
