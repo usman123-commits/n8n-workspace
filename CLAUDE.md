@@ -220,6 +220,7 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync | — |
 | `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | — |
 | `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | — |
+| `VTlIwLr3cK896sLO` | Workflow 4 – Checkout Ingestion | Google Sheets Trigger (RawCheckoutResponses) |
 | `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) |
 
 ---
@@ -500,15 +501,22 @@ Full docs: `docs/cold-email/`
 
 | ID | Workflow Name | Trigger Type |
 |----|--------------|--------------|
-| — | (to be created) | — |
+| `4TaA4kHwa5r1GULP` | CE-1 Lead Qualification Engine | Google Sheets Trigger (new row in Raw Leads) |
 
 ## Google Sheets — Cold Email Data
 
-**Spreadsheet ID:** _(to be created)_
+**Spreadsheet ID:** `1gF7uU_3KsWy5XGm16Rf1mNuDVy-tsTreEMDx0wGt244`
+**Sheet Name:** Zelvop Outreach System — 2026
 
 | Tab Name | Sheet ID (gid) | Purpose |
 |----------|----------------|---------|
-| — | — | — |
+| `Raw Leads` | `0` | New leads for scoring |
+| `NoWeb` | `1213372079` | Leads without websites |
+| `Approved Leads` | `161711194` | Scored >= 7, ready for email |
+| `Review Queue` | `987679073` | Scored < 7, manual review |
+| `Outreach Log` | `796443488` | Email send log |
+| `Reply Tracker` | `1582781887` | Reply tracking |
+| `Weekly Report` | `1740217095` | Weekly metrics |
 
 > Same rules apply: always use `mode: "id"` for both documentId and sheetName.
 
@@ -521,4 +529,10 @@ Full docs: `docs/cold-email/`
 ## Credential Names
 
 Uses the same n8n credentials as Cleaning Operations (Gmail, Google Sheets, etc.).
-Additional credentials will be added here as needed (e.g., email verification APIs, lead databases).
+
+| Service | Credential Name in n8n | Credential ID | Type |
+|---------|------------------------|---------------|------|
+| Google Sheets | `Google Sheets account` | `q52dbWoN6OaKRDZO` | OAuth2 |
+| Google Sheets Trigger | `Google Sheets Trigger account` | `E2pL4RCwwnxZSv1L` | OAuth2 |
+| Claude API | `Claude API` | `zlY2A0vDJbGDd7Ey` | HTTP Header Auth (`x-api-key`) |
+| Apify API | `Apify API` | `JFJHpRwTtiSH45ng` | HTTP Header Auth (`Authorization: Bearer`) |

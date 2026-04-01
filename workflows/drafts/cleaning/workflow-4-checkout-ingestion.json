@@ -1,0 +1,1004 @@
+{
+  "name": "Workflow 4 — Checkout Ingestion",
+  "nodes": [
+    {
+      "id": "34045355-b534-42e0-9ce6-bf06436729d4",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 4,
+      "position": [
+        -200,
+        0
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "E2pL4RCwwnxZSv1L",
+          "name": "Google Sheets Trigger account"
+        }
+      },
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 999999901,
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc5a1b2b-dd86-413f-9992-8647d0d07c99",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        40,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "2272589c-1367-4c41-979a-fc9c9c54633d",
+      "name": "Normalize and Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Normalize row and detect shortened Maps link.\nconst item = $input.first().json;\nconst get = (name) => {\n  const v = item[name];\n  if (v !== undefined && v !== null) return v;\n  const key = Object.keys(item).find(k => k.trim() === name);\n  return key !== undefined ? item[key] : undefined;\n};\nconst captureLocation = (get('Capture Location') ?? '').toString().trim();\nconst isShortLink = /^(https?:\\/\\/)?(www\\.)?(maps\\.app\\.goo\\.gl|goo\\.gl\\/maps)\\/\\S+/i.test(captureLocation);\nreturn [{ json: { ...item, captureLocation, isShortLink } }];"
+      }
+    },
+    {
+      "id": "b399829c-f95c-46d0-bd35-8bdfce2cb0e5",
+      "name": "Is Short Link?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "short",
+              "leftValue": "={{ $json.isShortLink }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2ec6c926-3fb0-43fa-bb09-8bbbbf647e0d",
+      "name": "Resolve Short Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        -200
+      ],
+      "parameters": {
+        "url": "={{ $json.captureLocation }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "10ee32fd-ac12-4628-b792-88754a1d0212",
+      "name": "Parse Short Link Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "// Parse GPS from HTTP response. Adapted for checkout fields.\ntry {\n  const form = $('Normalize and Check').first().json;\n  const get = (name) => {\n    const v = form[name];\n    if (v !== undefined && v !== null) return v;\n    const key = Object.keys(form).find(k => k.trim() === name);\n    return key !== undefined ? form[key] : undefined;\n  };\n  const bookingUid = (get('Booking ID') || '').toString().trim();\n  const cleanerIdFromForm = (get('Cleaner ID') || '').toString().trim();\n  const confirmCheckout = (get('Confirm Checkout') ?? '').toString().trim();\n  if (!bookingUid) throw new Error('Booking ID is missing');\n  if (!cleanerIdFromForm) throw new Error('Cleaner ID is missing');\n  if (!confirmCheckout || confirmCheckout.toLowerCase() !== 'yes') throw new Error('Checkout not confirmed');\n\n  const resp = $input.first().json;\n  const raw = (resp.data != null ? resp.data : resp.body != null ? resp.body : typeof resp === 'string' ? resp : JSON.stringify(resp));\n  const str = typeof raw === 'string' ? raw : String(raw);\n  let m = str.match(/q=(-?\\d+\\.\\d+)%2C(-?\\d+\\.\\d+)/);\n  if (!m) m = str.match(/(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);\n  if (!m) m = str.match(/3d(-?\\d+\\.\\d+)[^4]*4d(-?\\d+\\.\\d+)/);\n  // GPS parse failure: still return row with empty coords (4B will reject)\n  const gpsLat = m ? m[1] : '';\n  const gpsLng = m ? m[2] : '';\n\n  return [{ json: {\n    bookingUid, cleanerIdFromForm, gpsLat, gpsLng,\n    submissionTimestamp: (get('Timestamp') || new Date().toISOString()).toString(),\n    processingStatus: 'PENDING', resultMessage: '', processedAt: '',\n    hasError: false,\n    issueReported:    (get('Issue Reported?')  || '').toString().trim(),\n    issueType:        (get('Issue Type')        || '').toString().trim(),\n    description:      (get('Description')       || '').toString().trim(),\n    photoUrl:         (get('Photo Upload')       || '').toString().trim(),\n    priority:         (get('Priority')           || '').toString().trim(),\n    suppliesUsed:     (get('Supplies Used')      || '').toString().trim(),\n    quantityDetails:  (get('Quantity Details')   || '').toString().trim(),\n    lowStockAlert:    (get('Low Stock Alert')    || '').toString().trim()\n  } }];\n} catch (err) {\n  const form = $('Normalize and Check').first().json;\n  const get = (name) => { const v = form[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(form).find(k => k.trim() === name); return key !== undefined ? form[key] : undefined; };\n  return [{ json: { hasError: true, errorMessage: err.message, bookingUid: (get('Booking ID') || 'unknown').toString(), cleanerIdFromForm: (get('Cleaner ID') || '').toString(), submissionTimestamp: new Date().toISOString() } }];\n}"
+      }
+    },
+    {
+      "id": "049578cf-4cd5-4af5-be6f-c817d4e17d8f",
+      "name": "ParseAndValidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// ParseAndValidate: full URL, lat,lng, or DMS. Checkout version.\n// Design rule: GPS parse failure returns empty coords (not an error) — 4B rejects it.\ntry {\n  const item = $('Normalize and Check').first().json;\n  const get = (name) => {\n    const v = item[name];\n    if (v !== undefined && v !== null) return v;\n    const key = Object.keys(item).find(k => k.trim() === name);\n    return key !== undefined ? item[key] : undefined;\n  };\n  const bookingUid = (get('Booking ID') || '').toString().trim();\n  const cleanerIdFromForm = (get('Cleaner ID') || '').toString().trim();\n  const confirmCheckout = (get('Confirm Checkout') ?? '').toString().trim();\n  const mapsLink = (item.captureLocation != null ? item.captureLocation : (get('Capture Location') || '')).toString().trim();\n\n  if (!bookingUid) throw new Error('Booking ID is missing');\n  if (!cleanerIdFromForm) throw new Error('Cleaner ID is missing');\n  if (!confirmCheckout || confirmCheckout.toLowerCase() !== 'yes') throw new Error('Checkout not confirmed');\n  if (!mapsLink) throw new Error('Location link missing');\n\n  function parseLatLngFromString(str) {\n    const m = str.match(/(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);\n    if (m) return { lat: m[1], lng: m[2] };\n    const dmsRegex = /(\\d+)[\\u00b0\\u00ba]\\s*(\\d+)['′]\\s*([\\d.]+)[\"″]?\\s*([NS])\\s*(\\d+)[\\u00b0\\u00ba]\\s*(\\d+)['′]\\s*([\\d.]+)[\"″]?\\s*([EW])/i;\n    const dms = str.match(dmsRegex);\n    if (!dms) return null;\n    const latSign = dms[4].toUpperCase() === 'S' ? -1 : 1;\n    const lngSign = dms[8].toUpperCase() === 'W' ? -1 : 1;\n    const lat = latSign * (parseInt(dms[1],10) + parseInt(dms[2],10)/60 + parseFloat(dms[3])/3600);\n    const lng = lngSign * (parseInt(dms[5],10) + parseInt(dms[6],10)/60 + parseFloat(dms[7])/3600);\n    return { lat: String(lat), lng: String(lng) };\n  }\n  const parsed = parseLatLngFromString(mapsLink);\n  const gpsLat = parsed ? parsed.lat : '';\n  const gpsLng = parsed ? parsed.lng : '';\n\n  return [{ json: {\n    bookingUid, cleanerIdFromForm, gpsLat, gpsLng,\n    submissionTimestamp: (get('Timestamp') || new Date().toISOString()).toString(),\n    processingStatus: 'PENDING', resultMessage: '', processedAt: '',\n    hasError: false,\n    issueReported:    (get('Issue Reported?')  || '').toString().trim(),\n    issueType:        (get('Issue Type')        || '').toString().trim(),\n    description:      (get('Description')       || '').toString().trim(),\n    photoUrl:         (get('Photo Upload')       || '').toString().trim(),\n    priority:         (get('Priority')           || '').toString().trim(),\n    suppliesUsed:     (get('Supplies Used')      || '').toString().trim(),\n    quantityDetails:  (get('Quantity Details')   || '').toString().trim(),\n    lowStockAlert:    (get('Low Stock Alert')    || '').toString().trim()\n  } }];\n} catch (err) {\n  const item = $('Normalize and Check').first().json;\n  const get = (name) => { const v = item[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(item).find(k => k.trim() === name); return key !== undefined ? item[key] : undefined; };\n  return [{ json: { hasError: true, errorMessage: err.message, bookingUid: (get('Booking ID') || 'unknown').toString(), cleanerIdFromForm: (get('Cleaner ID') || '').toString(), submissionTimestamp: new Date().toISOString() } }];\n}"
+      }
+    },
+    {
+      "id": "760ba3e9-ff4f-4e5d-addc-2c1eaf3226e8",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "err-check",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1c03ae46-9cf5-4de9-81bb-0549f6a32c98",
+      "name": "Resolve Recipient",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1480,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "// Look up cleaner email. Fall back to admin.\nconst ADMIN_EMAIL = 'bgmazak123@gmail.com';\nconst cleanerIdFromForm = $json.cleanerIdFromForm || $json.fixedCleanerId || '';\nconst errorMessage = $json.errorMessage || 'Unknown error';\nconst bookingUid = $json.bookingUid || 'unknown';\n\nconst cleanerMap = {\n  '218jieksiei20iw0-ks2kwi219':      { email: 'bgmazak123@gmail.com',             name: 'Usman' },\n  'iwshwh38e8jsij28e892js21j2':      { email: 'nomiads222@gmail.com',             name: 'Nouman' },\n  'iwshwh3eeeesij28e892js21j2':      { email: 'noumanyounask@gmail.com',          name: 'Ali' },\n  'iwshwh3eeeeansaksjasjasjajs':     { email: 'office@daydrinkingproperties.com', name: 'David Schmutz' },\n  'jsljdjldjsljdjsdjsjdxmmxmxmxks':  { email: 'Kelly@daydrinkingproperties.com',  name: 'Kelly Williamson' },\n  'eb68f11d-c077-409b-a3':           { email: 'sdrenske86@gmail.com',             name: 'Sarah Drenske' },\n  'jsljdjldjsljdjsc2-ba96d3bf8af2':  { email: 'hollie.featherstone@gmail.com',    name: 'Hollie Featherstone' }\n};\n\nlet recipientEmail = ADMIN_EMAIL;\nlet recipientName = 'Admin';\nif (cleanerIdFromForm && cleanerMap[cleanerIdFromForm]) {\n  recipientEmail = cleanerMap[cleanerIdFromForm].email;\n  recipientName  = cleanerMap[cleanerIdFromForm].name;\n}\nreturn [{ json: { recipientEmail, recipientName, errorMessage, bookingUid, cleanerIdFromForm, submissionTimestamp: $json.submissionTimestamp || new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "9af6eda2-0877-4fb7-b842-e06fbe05ba6d",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1720,
+        -200
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={\"contents\":[{\"parts\":[{\"text\":\"You are an error message simplifier for a cleaning company automated system. A cleaner submitted a clock-out form and the system encountered an error. Explain the error in simple, friendly language that a cleaner can understand. Keep it to 2-3 sentences max. No technical jargon. If the error is about coordinates or GPS, say the location was not recognized please go under 100 meter radius of the property. If about checkout confirmation, say they need to confirm checkout. Always suggest what they can do to fix it. Original error: {{ $json.errorMessage }} Booking ID: {{ $json.bookingUid }} Cleaner: {{ $json.recipientName }} Write the simplified message only.\"}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":200}}",
+        "batching": {}
+      }
+    },
+    {
+      "id": "33162bad-13a6-4b0a-9de0-4c50d49a46ca",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        0
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "G4BlsVg8cIwBbbbD",
+          "name": "Usman2Account"
+        }
+      },
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "daf08f8e-20ba-4af3-95e5-b65c689e67d7",
+      "name": "Extract Simplified Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "const prev = $('Resolve Recipient').first().json;\nconst geminiResp = $input.first().json;\nlet simplifiedError = prev.errorMessage;\ntry { simplifiedError = geminiResp.candidates[0].content.parts[0].text.trim(); } catch (e) {}\nreturn [{ json: { ...prev, simplifiedError } }];"
+      }
+    },
+    {
+      "id": "80fd17fa-d166-44f3-b77c-73be34c096aa",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        -200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6sr232YN6z3c4tiW",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "={{ $json.recipientEmail }}",
+        "subject": "=Clock-Out Error — Booking {{ $json.bookingUid }}",
+        "emailType": "text",
+        "message": "={{ $('Basic LLM Chain').item.json.text }}\n\n— Cleaning Operations System",
+        "options": {}
+      }
+    },
+    {
+      "id": "467e032e-a6c1-4021-8e17-13cc7f7f0803",
+      "name": "Lookup Existing Checkout",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 999999902,
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            },
+            {
+              "lookupColumn": "processingStatus",
+              "lookupValue": "APPROVED"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a14aeb2b-db7a-4f23-8270-0a8bcb3fbb16",
+      "name": "Reject If Already Approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const existing = $input.all();\nlet parsed;\nlet parsedFromShortLink;\nlet parsedFromDirect;\ntry { parsedFromShortLink = $('Parse Short Link Response').first().json; } catch (_) {}\ntry { parsedFromDirect = $('ParseAndValidate').first().json; } catch (_) {}\n\nif (parsedFromShortLink && parsedFromDirect) {\n  const tsA = new Date(parsedFromShortLink.submissionTimestamp || 0).getTime();\n  const tsB = new Date(parsedFromDirect.submissionTimestamp || 0).getTime();\n  parsed = tsA >= tsB ? parsedFromShortLink : parsedFromDirect;\n} else {\n  parsed = parsedFromShortLink || parsedFromDirect;\n}\nif (!parsed) throw new Error('Missing parsed submission');\n\nconst hasApproved = existing.some(i =>\n  (i.json?.processingStatus ?? '').toString().trim() === 'APPROVED');\nif (hasApproved) return [{ json: { skipInsert: true } }];\nreturn [{ json: { ...parsed, skipInsert: false } }];"
+      }
+    },
+    {
+      "id": "5ab0f5f9-aa7b-4e28-a6c7-cf905d115e76",
+      "name": "Should Insert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "do-insert",
+              "leftValue": "={{ $json.skipInsert }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1e120f3a-f42d-46d9-87ba-57caf5928aa2",
+      "name": "Insert into CheckoutSubmissions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2200,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 999999902,
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleanerIdFromForm": "={{ $json.cleanerIdFromForm }}",
+            "gpsLat": "={{ $json.gpsLat }}",
+            "gpsLng": "={{ $json.gpsLng }}",
+            "submissionTimestamp": "={{ $json.submissionTimestamp }}",
+            "processingStatus": "={{ $json.processingStatus }}",
+            "resultMessage": "={{ $json.resultMessage }}",
+            "processedAt": "={{ $json.processedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gpsLat",
+              "displayName": "gpsLat",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gpsLng",
+              "displayName": "gpsLng",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submissionTimestamp",
+              "displayName": "submissionTimestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processingStatus",
+              "displayName": "processingStatus",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultMessage",
+              "displayName": "resultMessage",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processedAt",
+              "displayName": "processedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "08f0b82d-ad06-4894-b3d3-6704f6f6ab18",
+      "name": "Is Maintenance?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "maint-check",
+              "leftValue": "={{ $json.issueReported }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9bd4648c-f32f-4a25-a022-48cec67df1e3",
+      "name": "Append Maintenance Ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2680,
+        -200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 999999903,
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticketId": "=MT-{{ $json.bookingUid }}-{{ $now.toMillis() }}",
+            "bookingUid": "={{ $json.bookingUid }}",
+            "propertyUid": "",
+            "cleanerId": "={{ $json.cleanerIdFromForm }}",
+            "issueType": "={{ $json.issueType }}",
+            "description": "={{ $json.description }}",
+            "photoUrl": "={{ $json.photoUrl }}",
+            "priority": "={{ $json.priority }}",
+            "status": "OPEN",
+            "reportedAt": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ticketId",
+              "displayName": "ticketId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerId",
+              "displayName": "cleanerId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issueType",
+              "displayName": "issueType",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "photoUrl",
+              "displayName": "photoUrl",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reportedAt",
+              "displayName": "reportedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "63a641fb-46af-401f-9fcc-4b55ca7cdad5",
+      "name": "Parse Supply Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Parse Supplies Used + Quantity Details into one item per supply.\n// Returns empty array if no supplies used — downstream node won't run.\nconst bookingUid        = $json.bookingUid        || '';\nconst cleanerIdFromForm = $json.cleanerIdFromForm || '';\nconst loggedAt          = new Date().toISOString();\nconst suppliesUsed      = ($json.suppliesUsed    || '').trim();\nconst quantityDetails   = ($json.quantityDetails || '').trim();\n\nif (!suppliesUsed || suppliesUsed.toLowerCase() === 'none') {\n  return [];\n}\n\nconst items = suppliesUsed.split(',').map(s => s.trim()).filter(Boolean);\nreturn items.map(itemName => {\n  const escaped = itemName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n  const regex = new RegExp(escaped + '\\\\s*:\\\\s*(\\\\d+)', 'i');\n  const match = quantityDetails.match(regex);\n  const quantityUsed = match ? parseInt(match[1], 10) : 1;\n  return { json: { bookingUid, cleanerIdFromForm, propertyUid: '', itemName, quantityUsed, loggedAt } };\n});"
+      }
+    },
+    {
+      "id": "2dfb7b54-a702-474d-9543-62800f6c9857",
+      "name": "Append Supply Usage",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2680,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 999999904,
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleanerIdFromForm": "={{ $json.cleanerIdFromForm }}",
+            "propertyUid": "",
+            "itemName": "={{ $json.itemName }}",
+            "quantityUsed": "={{ $json.quantityUsed }}",
+            "loggedAt": "={{ $json.loggedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "itemName",
+              "displayName": "itemName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "quantityUsed",
+              "displayName": "quantityUsed",
+              "type": "number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "loggedAt",
+              "displayName": "loggedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "482e1ca1-809b-45c2-972d-6ae1b8b0c5a7",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -380
+      ],
+      "parameters": {
+        "width": 940,
+        "height": 300,
+        "content": "## Workflow 4 — Checkout Ingestion\n\nTriggers on new row in **RawCheckoutResponses** tab.\nValidates required fields, parses GPS, checks for duplicates, then:\n1. Inserts into **CheckoutSubmissions** (status = PENDING)\n2. In parallel: appends to **MaintenanceTickets** (if Issue Reported = Yes)\n3. In parallel: appends to **SupplyUsageLog** (one row per supply item)\n\nApproval/rejection is handled by **Workflow 4B** — this workflow only ingests.\nGPS parse failure does NOT block ingestion — 4B will reject the row.\n\n⚠️ **REPLACE GIDs BEFORE ACTIVATING** (all currently placeholder 99999990x):\n- RawCheckoutResponses: `999999901` → actual gid\n- CheckoutSubmissions: `999999902` → actual gid\n- MaintenanceTickets: `999999903` → actual gid\n- SupplyUsageLog: `999999904` → actual gid"
+      }
+    },
+    {
+      "id": "eb20c72f-e860-4664-a156-423dd2b50499",
+      "name": "Note: Parallel Branches",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        -140
+      ],
+      "parameters": {
+        "width": 620,
+        "height": 160,
+        "content": "**Parallel writes after CheckoutSubmissions insert.**\nBoth branches receive same input from `Should Insert?`:\n- **Left**: Maintenance ticket (only if issueReported = yes)\n- **Right**: Supply rows (one per item; returns [] if none → skips downstream)\n\n`propertyUid` is left empty here — Workflow 4B enriches it from CleaningJobs."
+      }
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Normalize and Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Check": {
+      "main": [
+        [
+          {
+            "node": "Is Short Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Short Link?": {
+      "main": [
+        [
+          {
+            "node": "Resolve Short Link",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ParseAndValidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Short Link": {
+      "main": [
+        [
+          {
+            "node": "Parse Short Link Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Short Link Response": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseAndValidate": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Resolve Recipient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Existing Checkout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Recipient": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Extract Simplified Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Simplified Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Existing Checkout": {
+      "main": [
+        [
+          {
+            "node": "Reject If Already Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject If Already Approved": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Should Insert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Insert?": {
+      "main": [
+        [
+          {
+            "node": "Insert into CheckoutSubmissions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Maintenance?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Supply Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Maintenance?": {
+      "main": [
+        [
+          {
+            "node": "Append Maintenance Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Parse Supply Items": {
+      "main": [
+        [
+          {
+            "node": "Append Supply Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
