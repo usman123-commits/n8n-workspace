@@ -268,6 +268,10 @@ For `sheetName`, use `"mode": "id"` with the numeric gid:
 | `CleanersProfile` | `1920390373` | Cleaner info |
 | `CancelledBookings` | `1881509778` | Cancellation records |
 | `Properties` | `766791868` | Property data |
+| `RawCheckoutResponses` | `1680465218` | Raw checkout form responses |
+| `CheckoutSubmissions` | `1292187736` | Validated checkout submissions |
+| `MaintenanceTickets` | `569911294` | Maintenance issue reports |
+| `SupplyUsageLog` | `469288724` | Supply usage per booking |
 
 When verifying workflow output, always read the relevant tab directly using MCP tools.
 Use the Spreadsheet ID above — do not ask the human for it.
