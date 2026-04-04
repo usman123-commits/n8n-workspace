@@ -222,6 +222,7 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | — |
 | `VTlIwLr3cK896sLO` | Workflow 4 – Checkout Ingestion | Google Sheets Trigger (RawCheckoutResponses) |
 | `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) |
+| `7X0QKeFueWTdz0GW` | Workflow 5 – Payroll Processing | Schedule (daily 02:00 UTC) |
 
 ---
 
@@ -272,6 +273,8 @@ For `sheetName`, use `"mode": "id"` with the numeric gid:
 | `CheckoutSubmissions` | `1292187736` | Validated checkout submissions |
 | `MaintenanceTickets` | `569911294` | Maintenance issue reports |
 | `SupplyUsageLog` | `469288724` | Supply usage per booking |
+| `PayrollRecords` | `166953005` | Payroll records (one per completed job) |
+| `PayrollErrors` | `1485642013` | Payroll calculation errors for admin review |
 
 When verifying workflow output, always read the relevant tab directly using MCP tools.
 Use the Spreadsheet ID above — do not ask the human for it.

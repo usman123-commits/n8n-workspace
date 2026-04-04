@@ -1,0 +1,1300 @@
+{
+    "name": "Workflow 5 – Payroll Processing",
+    "nodes": [
+        {
+            "parameters": {
+                "content": "## Workflow 5 – Payroll Processing\n\n**Trigger:** Daily at 02:00 UTC (change cron to `0 2 * * 0` for weekly on Sundays)\n\n**What it does:**\n1. Reads CleanersProfile, Properties, CleaningJobs, PayrollRecords\n2. Filters to COMPLETED jobs with no payroll yet\n3. Per job: calculates hours, validates cleaner rate, checks for duplicates\n4. Writes PayrollRecord, updates CleaningJob + Reservation to READY\n5. Sends one admin summary email after all jobs are processed\n\n**ONE-TIME SETUP (before first run):**\n- Add `payrollStatus` header to CleaningJobs tab as column AF (col 32)\n- Add `hourlyRate` values in CleanersProfile tab col H for each cleaner\n- Replace `admin@example.com` in the Send Summary Email node\n\n**Design rules:**\n- Only processes COMPLETED jobs (status check is strict)\n- Snapshots hourlyRate at calculation time\n- Duplicate protection via PayrollRecords bookingUid check\n- Errors logged to PayrollErrors tab — do NOT stop the batch\n- No payments: records READY/UNPAID only",
+                "height": 440,
+                "width": 640,
+                "color": 5
+            },
+            "id": "aa000001-0000-0000-0000-000000000001",
+            "name": "Sticky Note",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                -300,
+                -520
+            ]
+        },
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 2 * * *"
+                        }
+                    ]
+                }
+            },
+            "id": "aa000002-0000-0000-0000-000000000002",
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                0
+            ],
+            "notes": "Daily at 02:00 UTC. Change cron to '0 2 * * 0' for weekly (Sundays only)."
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "1920390373",
+                    "mode": "id"
+                },
+                "options": {}
+            },
+            "id": "aa000003-0000-0000-0000-000000000003",
+            "name": "Read CleanersProfile",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                280,
+                0
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Reads all cleaners. Used: cleanerId, name, email, hourlyRate (col H)."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Reduce to one item so Read Properties runs once (not once per cleaner row).\nreturn [{ json: {} }];"
+            },
+            "id": "aa000004-0000-0000-0000-000000000004",
+            "name": "Pass Single Item 1",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                560,
+                0
+            ],
+            "notes": "Prevents fanout. CleanersProfile data remains accessible via $('Read CleanersProfile').all()."
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "766791868",
+                    "mode": "id"
+                },
+                "options": {}
+            },
+            "id": "aa000005-0000-0000-0000-000000000005",
+            "name": "Read Properties",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                840,
+                0
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Reads all properties. Used: propertyUid, propertyName."
+        },
+        {
+            "parameters": {
+                "jsCode": "return [{ json: {} }];"
+            },
+            "id": "aa000006-0000-0000-0000-000000000006",
+            "name": "Pass Single Item 2",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1120,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "options": {}
+            },
+            "id": "aa000007-0000-0000-0000-000000000007",
+            "name": "Read CleaningJobs",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                1400,
+                0
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Reads all cleaning jobs. Filter Eligible Jobs narrows to COMPLETED + unpaid."
+        },
+        {
+            "parameters": {
+                "jsCode": "return [{ json: {} }];"
+            },
+            "id": "aa000008-0000-0000-0000-000000000008",
+            "name": "Pass Single Item 3",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1680,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "166953005",
+                    "mode": "id"
+                },
+                "options": {}
+            },
+            "id": "aa000009-0000-0000-0000-000000000009",
+            "name": "Read All PayrollRecords",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                1960,
+                0
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Snapshot of existing payroll records loaded once at startup. Used by Check Duplicate inside the loop."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Filter CleaningJobs to only rows eligible for payroll.\n// Eligible: status=COMPLETED, payrollStatus empty or NOT_STARTED, both clock times present.\nconst allJobs = $('Read CleaningJobs').all();\n\nconst eligible = allJobs.filter(item => {\n  const j = item.json || {};\n  const status        = (j.status        || '').toString().trim();\n  const payrollStatus = (j.payrollStatus || '').toString().trim();\n  const clockIn       = (j.clockInTimeUTC  || '').toString().trim();\n  const clockOut      = (j.clockOutTimeUTC || '').toString().trim();\n  return (\n    status === 'COMPLETED' &&\n    (payrollStatus === '' || payrollStatus === 'NOT_STARTED') &&\n    clockIn  !== '' &&\n    clockOut !== ''\n  );\n});\n\nreturn eligible;"
+            },
+            "id": "aa000010-0000-0000-0000-000000000010",
+            "name": "Filter Eligible Jobs",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2240,
+                0
+            ],
+            "notes": "Returns eligible jobs by reading $('Read CleaningJobs').all() — not $input — so the Pass Single Item chain does not affect availability."
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 1
+                    },
+                    "conditions": [
+                        {
+                            "id": "c-eligible",
+                            "leftValue": "={{ $input.all().length }}",
+                            "rightValue": 0,
+                            "operator": {
+                                "type": "number",
+                                "operation": "gt",
+                                "name": "filter.operator.gt"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "aa000011-0000-0000-0000-000000000011",
+            "name": "IF: Any Eligible Jobs?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                2520,
+                0
+            ],
+            "notes": "True: jobs found -> continue. False: nothing to do -> workflow ends cleanly (no email sent)."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Reset summary data from any previous execution.\n// $workflow.staticData persists within this execution across SiB iterations.\n$workflow.staticData.payrollSummary = {\n  processed: [],\n  errors:    [],\n  startedAt: new Date().toISOString()\n};\nreturn $input.all();"
+            },
+            "id": "aa000012-0000-0000-0000-000000000012",
+            "name": "Initialize Summary",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2800,
+                0
+            ],
+            "notes": "Clears any stale staticData from previous runs, passes eligible jobs through to SiB."
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "aa000013-0000-0000-0000-000000000013",
+            "name": "Split In Batches",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                3080,
+                0
+            ],
+            "notes": "Batch size 1. Output 0 = done (-> Compile Summary Email). Output 1 = loop (-> Calculate Worked Hours)."
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $input.first().json;\n\nconst clockIn  = new Date(job.clockInTimeUTC);\nconst clockOut = new Date(job.clockOutTimeUTC);\n\nif (isNaN(clockIn.getTime()) || isNaN(clockOut.getTime())) {\n  return [{ json: {\n    ...job,\n    _payrollError: true,\n    _errorMessage: 'Invalid clock time format — could not parse clockInTimeUTC or clockOutTimeUTC'\n  }}];\n}\n\nconst diffMs      = clockOut - clockIn;\nconst workedHours = Math.round((diffMs / 3600000) * 100) / 100;\n\nlet _payrollError = false;\nlet _errorMessage = '';\n\nif (workedHours < 0) {\n  _payrollError = true;\n  _errorMessage = 'Negative duration — clock-out is before clock-in';\n} else if (workedHours > 12) {\n  _payrollError = true;\n  _errorMessage = 'Duration exceeds 12 hours — likely data error';\n} else if (workedHours === 0) {\n  _payrollError = true;\n  _errorMessage = 'Zero duration — clock-in equals clock-out';\n}\n\nreturn [{ json: { ...job, workedHours, _payrollError, _errorMessage } }];"
+            },
+            "id": "aa000014-0000-0000-0000-000000000014",
+            "name": "Calculate Worked Hours",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3360,
+                0
+            ],
+            "notes": "Parses UTC timestamps, computes decimal hours (e.g. 2h45m = 2.75). Sanity checks: negative, zero, or >12h."
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 1
+                    },
+                    "conditions": [
+                        {
+                            "id": "c-sanity",
+                            "leftValue": "={{ $json._payrollError }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "aa000015-0000-0000-0000-000000000015",
+            "name": "IF: Sanity Error?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                3640,
+                0
+            ],
+            "notes": "True -> log error, update job status, loop back. False -> continue to cleaner lookup."
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "1485642013",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "cleanerId": "={{ $json.cleanerId }}",
+                        "errorMessage": "={{ $json._errorMessage }}",
+                        "clockInTimeUTC": "={{ $json.clockInTimeUTC }}",
+                        "clockOutTimeUTC": "={{ $json.clockOutTimeUTC }}",
+                        "detectedAt": "={{ new Date().toISOString() }}"
+                    }
+                },
+                "options": {}
+            },
+            "id": "aa000016-0000-0000-0000-000000000016",
+            "name": "Append PayrollErrors: Sanity",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                3920,
+                340
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Runs BEFORE the job status update so _errorMessage is still in $json."
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "payrollStatus": "ERROR"
+                    },
+                    "matchingColumns": [
+                        "bookingUid"
+                    ],
+                    "schema": [
+                        {
+                            "id": "bookingUid",
+                            "displayName": "bookingUid",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "aa000017-0000-0000-0000-000000000017",
+            "name": "Update Job: Sanity ERROR",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                4200,
+                340
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Sets payrollStatus=ERROR on CleaningJobs row so it won't be retried. $json.bookingUid comes from the PayrollErrors append output."
+        },
+        {
+            "parameters": {
+                "jsCode": "const sd = $workflow.staticData;\nif (!sd.payrollSummary) sd.payrollSummary = { processed: [], errors: [] };\nsd.payrollSummary.errors.push({\n  bookingUid:   ($json.bookingUid || '').toString(),\n  errorMessage: 'Sanity check failed — see PayrollErrors tab'\n});\nreturn $input.all();"
+            },
+            "id": "aa000018-0000-0000-0000-000000000018",
+            "name": "Accumulate Error: Sanity",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                4480,
+                340
+            ],
+            "notes": "Pushes error into staticData summary, then loops back to SiB."
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $input.first().json;\nconst cleaners = $('Read CleanersProfile').all();\n\nconst row = cleaners.find(r => {\n  const c = r.json || r;\n  return (c.cleanerId || '').toString().trim() === (job.cleanerId || '').toString().trim();\n});\n\nif (!row) {\n  return [{ json: {\n    ...job,\n    _payrollError: true,\n    _errorMessage: `Cleaner not found in CleanersProfile — cleanerId: ${job.cleanerId}`\n  }}];\n}\n\nconst c = row.json || row;\nconst hourlyRate   = parseFloat(c.hourlyRate) || 0;\nconst cleanerName  = (c.name || c.cleanerName || c.cleanerId || '').toString().trim();\nconst cleanerEmail = (c.email || '').toString().trim();\n\nif (!hourlyRate || hourlyRate <= 0) {\n  return [{ json: {\n    ...job,\n    _payrollError: true,\n    _errorMessage: `Missing or zero hourlyRate for cleanerId: ${job.cleanerId} — add value to CleanersProfile col H`\n  }}];\n}\n\nreturn [{ json: {\n  ...job,\n  _payrollError: false,\n  _errorMessage: '',\n  cleanerName,\n  cleanerEmail,\n  hourlyRate\n}}];"
+            },
+            "id": "aa000019-0000-0000-0000-000000000019",
+            "name": "Lookup Cleaner Details",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3920,
+                -340
+            ],
+            "notes": "Finds cleaner by cleanerId in pre-loaded CleanersProfile. Errors if not found or hourlyRate missing/zero."
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 1
+                    },
+                    "conditions": [
+                        {
+                            "id": "c-rate",
+                            "leftValue": "={{ $json._payrollError }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "aa000020-0000-0000-0000-000000000020",
+            "name": "IF: Cleaner Rate Error?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                4200,
+                -340
+            ],
+            "notes": "True -> log error, update job, loop back. False -> continue to property lookup."
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "1485642013",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "cleanerId": "={{ $json.cleanerId }}",
+                        "errorMessage": "={{ $json._errorMessage }}",
+                        "clockInTimeUTC": "={{ $json.clockInTimeUTC }}",
+                        "clockOutTimeUTC": "={{ $json.clockOutTimeUTC }}",
+                        "detectedAt": "={{ new Date().toISOString() }}"
+                    }
+                },
+                "options": {}
+            },
+            "id": "aa000021-0000-0000-0000-000000000021",
+            "name": "Append PayrollErrors: Rate",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                4480,
+                0
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Logs missing-rate error while _errorMessage is still in $json."
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "payrollStatus": "ERROR"
+                    },
+                    "matchingColumns": [
+                        "bookingUid"
+                    ],
+                    "schema": [
+                        {
+                            "id": "bookingUid",
+                            "displayName": "bookingUid",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "aa000022-0000-0000-0000-000000000022",
+            "name": "Update Job: Rate ERROR",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                4760,
+                0
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const sd = $workflow.staticData;\nif (!sd.payrollSummary) sd.payrollSummary = { processed: [], errors: [] };\nsd.payrollSummary.errors.push({\n  bookingUid:   ($json.bookingUid || '').toString(),\n  errorMessage: 'Cleaner rate error — see PayrollErrors tab'\n});\nreturn $input.all();"
+            },
+            "id": "aa000023-0000-0000-0000-000000000023",
+            "name": "Accumulate Error: Rate",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                5040,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $input.first().json;\nconst properties = $('Read Properties').all();\nconst row = properties.find(r => {\n  const p = r.json || r;\n  return (p.propertyUid || '').toString().trim() === (job.propertyUid || '').toString().trim();\n});\nconst propertyName = row\n  ? ((row.json || row).propertyName || job.propertyUid || '').toString().trim()\n  : (job.propertyUid || '').toString().trim();\n\nreturn [{ json: { ...job, propertyName } }];"
+            },
+            "id": "aa000024-0000-0000-0000-000000000024",
+            "name": "Lookup Property Details",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                4480,
+                -680
+            ],
+            "notes": "Finds propertyName from pre-loaded Properties. Falls back to propertyUid (non-fatal)."
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $input.first().json;\nconst grossPay = Math.round(job.workedHours * job.hourlyRate * 100) / 100;\nreturn [{ json: { ...job, grossPay } }];"
+            },
+            "id": "aa000025-0000-0000-0000-000000000025",
+            "name": "Calculate Gross Pay",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                4760,
+                -680
+            ],
+            "notes": "grossPay = workedHours x hourlyRate, rounded to 2 decimal places."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Uses snapshot loaded at startup — avoids hitting Sheets API on every iteration.\n// If workflow ran earlier today, new records from that run are NOT in the snapshot,\n// so they will be caught by the payrollStatus=READY filter in Filter Eligible Jobs.\nconst job = $input.first().json;\nconst existingRecords = $('Read All PayrollRecords').all();\nconst isDuplicate = existingRecords.some(r => {\n  const rec = r.json || r;\n  const uid = (rec.bookingUid || '').toString().trim();\n  const pid = (rec.payrollId  || '').toString().trim();\n  return uid === (job.bookingUid || '').toString().trim() && pid !== '';\n});\nreturn [{ json: { ...job, _isDuplicate: isDuplicate } }];"
+            },
+            "id": "aa000026-0000-0000-0000-000000000026",
+            "name": "Check Duplicate",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                5040,
+                -680
+            ],
+            "notes": "Checks snapshot of PayrollRecords loaded at startup. Prevents double-write if workflow reruns within the same day."
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 1
+                    },
+                    "conditions": [
+                        {
+                            "id": "c-dup",
+                            "leftValue": "={{ $json._isDuplicate }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "aa000027-0000-0000-0000-000000000027",
+            "name": "IF: Duplicate?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                5320,
+                -680
+            ],
+            "notes": "True -> skip (already processed). False -> write PayrollRecord."
+        },
+        {
+            "parameters": {},
+            "id": "aa000028-0000-0000-0000-000000000028",
+            "name": "Skip: Already Processed",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                5600,
+                -340
+            ],
+            "notes": "No-op. Loops back to SiB for the next job."
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "166953005",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "payrollId": "={{ 'PR-' + $json.bookingUid }}",
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "cleanerId": "={{ $json.cleanerId }}",
+                        "cleanerName": "={{ $json.cleanerName }}",
+                        "propertyUid": "={{ $json.propertyUid }}",
+                        "propertyName": "={{ $json.propertyName }}",
+                        "cleaningDate": "={{ $json.cleaningDate }}",
+                        "clockInTimeUTC": "={{ $json.clockInTimeUTC }}",
+                        "clockOutTimeUTC": "={{ $json.clockOutTimeUTC }}",
+                        "workedHours": "={{ $json.workedHours }}",
+                        "hourlyRate": "={{ $json.hourlyRate }}",
+                        "grossPay": "={{ $json.grossPay }}",
+                        "payrollStatus": "READY",
+                        "processedAt": "={{ new Date().toISOString() }}",
+                        "paymentStatus": "UNPAID"
+                    }
+                },
+                "options": {}
+            },
+            "id": "aa000029-0000-0000-0000-000000000029",
+            "name": "Append PayrollRecord",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                5600,
+                -1020
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Writes one row to PayrollRecords. hourlyRate is snapshotted here — historical records are unaffected by future rate changes."
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "workedHours": "={{ $json.workedHours }}",
+                        "payrollStatus": "READY"
+                    },
+                    "matchingColumns": [
+                        "bookingUid"
+                    ],
+                    "schema": [
+                        {
+                            "id": "bookingUid",
+                            "displayName": "bookingUid",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true
+                        },
+                        {
+                            "id": "workedHours",
+                            "displayName": "workedHours",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "number",
+                            "canBeUsedToMatch": false
+                        },
+                        {
+                            "id": "payrollStatus",
+                            "displayName": "payrollStatus",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": false
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "aa000030-0000-0000-0000-000000000030",
+            "name": "Update CleaningJob: READY",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                5880,
+                -1020
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Writes workedHours + payrollStatus=READY to CleaningJobs. Requires payrollStatus column in CleaningJobs tab (add as col AF)."
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "569949670",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "payrollStatus": "READY"
+                    },
+                    "matchingColumns": [
+                        "bookingUid"
+                    ],
+                    "schema": [
+                        {
+                            "id": "bookingUid",
+                            "displayName": "bookingUid",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true
+                        },
+                        {
+                            "id": "payrollStatus",
+                            "displayName": "payrollStatus",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": false
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "aa000031-0000-0000-0000-000000000031",
+            "name": "Update Reservation: READY",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [
+                6160,
+                -1020
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Marks Reservations payrollStatus=READY. Column already exists in Reservations tab."
+        },
+        {
+            "parameters": {
+                "jsCode": "// Reads from Calculate Gross Pay (before GSheets nodes overwrote $json).\nconst job = $('Calculate Gross Pay').last().json;\nconst sd  = $workflow.staticData;\nif (!sd.payrollSummary) sd.payrollSummary = { processed: [], errors: [] };\nsd.payrollSummary.processed.push({\n  cleanerName:  (job.cleanerName  || job.cleanerId   || '').toString(),\n  propertyName: (job.propertyName || job.propertyUid || '').toString(),\n  cleaningDate: (job.cleaningDate || '').toString(),\n  workedHours:  job.workedHours || 0,\n  grossPay:     job.grossPay    || 0\n});\nreturn $input.all();"
+            },
+            "id": "aa000032-0000-0000-0000-000000000032",
+            "name": "Accumulate Success",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                6440,
+                -1020
+            ],
+            "notes": "References $('Calculate Gross Pay').last() for clean job data before downstream GSheets nodes overwrote $json."
+        },
+        {
+            "parameters": {
+                "jsCode": "const sd      = $workflow.staticData;\nconst summary = sd.payrollSummary || { processed: [], errors: [] };\nconst today   = new Date().toISOString().slice(0, 10);\n\nconst totalHours = summary.processed.reduce((s, j) => s + (j.workedHours || 0), 0);\nconst totalGross = summary.processed.reduce((s, j) => s + (j.grossPay    || 0), 0);\n\nconst jobRows = summary.processed.map(j =>\n  `<tr>\n    <td style=\"padding:6px 10px\">${j.cleanerName}</td>\n    <td style=\"padding:6px 10px\">${j.propertyName}</td>\n    <td style=\"padding:6px 10px\">${j.cleaningDate}</td>\n    <td style=\"padding:6px 10px;text-align:right\">${Number(j.workedHours).toFixed(2)}h</td>\n    <td style=\"padding:6px 10px;text-align:right\">$${Number(j.grossPay).toFixed(2)}</td>\n  </tr>`\n).join('') || '<tr><td colspan=\"5\" style=\"padding:6px 10px;color:#888\">No jobs processed</td></tr>';\n\nlet errorSection = '';\nif (summary.errors.length > 0) {\n  const errorItems = summary.errors\n    .map(e => `<li><strong>${e.bookingUid}</strong>: ${e.errorMessage}</li>`)\n    .join('');\n  errorSection = `\n    <h3 style=\"color:#c0392b;margin-top:24px\">Errors (${summary.errors.length}) — see PayrollErrors tab</h3>\n    <ul style=\"line-height:1.7\">${errorItems}</ul>`;\n}\n\nconst html = `\n<h2 style=\"color:#2c3e50\">Payroll Processing Summary — ${today}</h2>\n<table style=\"border-collapse:collapse;margin-bottom:8px\">\n  <tr><td style=\"padding:4px 12px 4px 0\"><strong>Jobs processed:</strong></td><td>${summary.processed.length}</td></tr>\n  <tr><td style=\"padding:4px 12px 4px 0\"><strong>Errors:</strong></td><td>${summary.errors.length}</td></tr>\n  <tr><td style=\"padding:4px 12px 4px 0\"><strong>Total hours:</strong></td><td>${totalHours.toFixed(2)}h</td></tr>\n  <tr><td style=\"padding:4px 12px 4px 0\"><strong>Total gross pay:</strong></td><td>$$${totalGross.toFixed(2)}</td></tr>\n</table>\n<h3 style=\"margin-top:24px\">Processed Jobs</h3>\n<table border=\"1\" cellspacing=\"0\" style=\"border-collapse:collapse;border-color:#ddd\">\n  <thead>\n    <tr style=\"background:#f5f5f5\">\n      <th style=\"padding:6px 10px\">Cleaner</th>\n      <th style=\"padding:6px 10px\">Property</th>\n      <th style=\"padding:6px 10px\">Date</th>\n      <th style=\"padding:6px 10px\">Hours</th>\n      <th style=\"padding:6px 10px\">Gross Pay</th>\n    </tr>\n  </thead>\n  <tbody>${jobRows}</tbody>\n  <tfoot>\n    <tr style=\"background:#f5f5f5;font-weight:bold\">\n      <td colspan=\"3\" style=\"padding:6px 10px\">Total</td>\n      <td style=\"padding:6px 10px;text-align:right\">${totalHours.toFixed(2)}h</td>\n      <td style=\"padding:6px 10px;text-align:right\">$$${totalGross.toFixed(2)}</td>\n    </tr>\n  </tfoot>\n</table>\n${errorSection}\n<p style=\"margin-top:32px;color:#888;font-size:12px\">Generated by Workflow 5 – Payroll Processing &bull; ${new Date().toISOString()}</p>`;\n\n// Clean up after use\nsd.payrollSummary = null;\n\nreturn [{ json: {\n  subject:     'Payroll Processing Summary — ' + today,\n  htmlBody:    html,\n  totalJobs:   summary.processed.length + summary.errors.length,\n  totalErrors: summary.errors.length,\n  totalHours:  Math.round(totalHours * 100) / 100,\n  totalGross:  Math.round(totalGross * 100) / 100\n}}];"
+            },
+            "id": "aa000033-0000-0000-0000-000000000033",
+            "name": "Compile Summary Email",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3360,
+                -680
+            ],
+            "notes": "Fires on SiB output 0 (done). Reads accumulated staticData, builds HTML email, clears staticData."
+        },
+        {
+            "parameters": {
+                "sendTo": "admin@example.com",
+                "subject": "={{ $json.subject }}",
+                "message": "={{ $json.htmlBody }}",
+                "options": {
+                    "emailType": "html"
+                }
+            },
+            "id": "aa000034-0000-0000-0000-000000000034",
+            "name": "Send Summary Email",
+            "type": "n8n-nodes-base.gmail",
+            "typeVersion": 2.1,
+            "position": [
+                3640,
+                -680
+            ],
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "6sr232YN6z3c4tiW",
+                    "name": "Gmail account"
+                }
+            },
+            "notes": "REPLACE admin@example.com before activating. Sends one email per run (not per job). Not sent if zero eligible jobs found."
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Read CleanersProfile",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read CleanersProfile": {
+            "main": [
+                [
+                    {
+                        "node": "Pass Single Item 1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pass Single Item 1": {
+            "main": [
+                [
+                    {
+                        "node": "Read Properties",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read Properties": {
+            "main": [
+                [
+                    {
+                        "node": "Pass Single Item 2",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pass Single Item 2": {
+            "main": [
+                [
+                    {
+                        "node": "Read CleaningJobs",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read CleaningJobs": {
+            "main": [
+                [
+                    {
+                        "node": "Pass Single Item 3",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pass Single Item 3": {
+            "main": [
+                [
+                    {
+                        "node": "Read All PayrollRecords",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read All PayrollRecords": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Eligible Jobs",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Eligible Jobs": {
+            "main": [
+                [
+                    {
+                        "node": "IF: Any Eligible Jobs?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IF: Any Eligible Jobs?": {
+            "main": [
+                [
+                    {
+                        "node": "Initialize Summary",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "Initialize Summary": {
+            "main": [
+                [
+                    {
+                        "node": "Split In Batches",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Split In Batches": {
+            "main": [
+                [
+                    {
+                        "node": "Compile Summary Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Calculate Worked Hours",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Calculate Worked Hours": {
+            "main": [
+                [
+                    {
+                        "node": "IF: Sanity Error?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IF: Sanity Error?": {
+            "main": [
+                [
+                    {
+                        "node": "Append PayrollErrors: Sanity",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Lookup Cleaner Details",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Append PayrollErrors: Sanity": {
+            "main": [
+                [
+                    {
+                        "node": "Update Job: Sanity ERROR",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update Job: Sanity ERROR": {
+            "main": [
+                [
+                    {
+                        "node": "Accumulate Error: Sanity",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Accumulate Error: Sanity": {
+            "main": [
+                [
+                    {
+                        "node": "Split In Batches",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Lookup Cleaner Details": {
+            "main": [
+                [
+                    {
+                        "node": "IF: Cleaner Rate Error?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IF: Cleaner Rate Error?": {
+            "main": [
+                [
+                    {
+                        "node": "Append PayrollErrors: Rate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Lookup Property Details",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Append PayrollErrors: Rate": {
+            "main": [
+                [
+                    {
+                        "node": "Update Job: Rate ERROR",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update Job: Rate ERROR": {
+            "main": [
+                [
+                    {
+                        "node": "Accumulate Error: Rate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Accumulate Error: Rate": {
+            "main": [
+                [
+                    {
+                        "node": "Split In Batches",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Lookup Property Details": {
+            "main": [
+                [
+                    {
+                        "node": "Calculate Gross Pay",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Calculate Gross Pay": {
+            "main": [
+                [
+                    {
+                        "node": "Check Duplicate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Duplicate": {
+            "main": [
+                [
+                    {
+                        "node": "IF: Duplicate?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IF: Duplicate?": {
+            "main": [
+                [
+                    {
+                        "node": "Skip: Already Processed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Append PayrollRecord",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Skip: Already Processed": {
+            "main": [
+                [
+                    {
+                        "node": "Split In Batches",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Append PayrollRecord": {
+            "main": [
+                [
+                    {
+                        "node": "Update CleaningJob: READY",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update CleaningJob: READY": {
+            "main": [
+                [
+                    {
+                        "node": "Update Reservation: READY",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update Reservation: READY": {
+            "main": [
+                [
+                    {
+                        "node": "Accumulate Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Accumulate Success": {
+            "main": [
+                [
+                    {
+                        "node": "Split In Batches",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Compile Summary Email": {
+            "main": [
+                [
+                    {
+                        "node": "Send Summary Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    }
+}
