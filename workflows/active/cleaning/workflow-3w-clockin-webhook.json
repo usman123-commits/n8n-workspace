@@ -1,0 +1,786 @@
+{
+  "name": "Workflow 3W — Clock-In Ingestion (Webhook)",
+  "nodes": [
+    {
+      "id": "b2051950-b214-43d7-afcf-dba80934b8b0",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        200
+      ],
+      "webhookId": "3f7f29b6-be9a-45c7-96cb-7f805e339cf9",
+      "parameters": {
+        "path": "clockin",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "823be718-3a8f-42fb-97d8-74920870425d",
+      "name": "Normalize and Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Normalize field names: accept React camelCase OR Google Sheets column names.\n// Webhook nests POST body under $json.body — unwrap it.\nconst raw = $input.first().json;\nconst item = raw.body || raw;\nconst normalized = {\n  'Booking ID':       (item.bookingId       || item['Booking ID']       || '').toString().trim(),\n  'Cleaner ID':       (item.cleanerId        || item['Cleaner ID']       || '').toString().trim(),\n  'Confirm Arrival':  (item.confirmArrival   || item['Confirm Arrival']  || '').toString().trim(),\n  'Capture Location': (item.captureLocation  || item['Capture Location'] || '').toString().trim(),\n  'submittedAt':      (item.submittedAt      || item['Timestamp']        || new Date().toISOString()),\n};\nconst captureLocation = normalized['Capture Location'];\nconst isShortLink = /^(https?:\\/\\/)?(www\\.)?(maps\\.app\\.goo\\.gl|goo\\.gl\\/maps)\\/\\S+/i.test(captureLocation);\nreturn [{ json: { ...normalized, captureLocation, isShortLink } }];"
+      }
+    },
+    {
+      "id": "ed7a8a51-11c8-4358-9e64-a1571efd885c",
+      "name": "Append to Raw Form Responses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        280,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 0,
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.submittedAt }}",
+            "Booking ID": "={{ $json['Booking ID'] }}",
+            "Cleaner ID": "={{ $json['Cleaner ID'] }}",
+            "Confirm Arrival": "={{ $json['Confirm Arrival'] }}",
+            "Capture Location": "={{ $json.captureLocation }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cleaner ID",
+              "displayName": "Cleaner ID",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Confirm Arrival",
+              "displayName": "Confirm Arrival",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Capture Location",
+              "displayName": "Capture Location",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "de6d6555-3493-4d2a-926a-df3e382fec8c",
+      "name": "Is Short Link?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        520,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "short",
+              "leftValue": "={{ $json.isShortLink }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8e1a78f9-9f1e-472f-b28c-0c037b99244b",
+      "name": "Resolve Short Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.captureLocation }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "b46b140e-42c8-4f29-9ad8-73c8dbca67a2",
+      "name": "Parse Short Link Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Parse coords from HTTP response body.\ntry {\n  const form = $('Normalize and Check').first().json;\n  const get = (name) => { const v = form[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(form).find(k => k.trim() === name); return key !== undefined ? form[key] : undefined; };\n  const bookingUid = get('Booking ID');\n  const fixedCleanerId = get('Cleaner ID');\n  const confirmArrival = (get('Confirm Arrival') ?? '').toString().trim();\n  if (!confirmArrival || confirmArrival.toLowerCase() !== 'yes') throw new Error('Arrival not confirmed');\n\n  const resp = $input.first().json;\n  const raw = (resp.data != null ? resp.data : resp.body != null ? resp.body : typeof resp === 'string' ? resp : JSON.stringify(resp));\n  const str = typeof raw === 'string' ? raw : String(raw);\n  let m = str.match(/q=(-?\\d+\\.\\d+)%2C(-?\\d+\\.\\d+)/);\n  if (!m) m = str.match(/(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);\n  if (!m) m = str.match(/3d(-?\\d+\\.\\d+)[^4]*4d(-?\\d+\\.\\d+)/);\n  if (!m) throw new Error('Could not find coordinates in short link response.');\n\n  return [{ json: { bookingUid, fixedCleanerId, gpsLat: m[1], gpsLng: m[2], submissionTimestamp: new Date().toISOString(), processingStatus: 'PENDING', resultMessage: '', processedAt: '', hasError: false } }];\n} catch (err) {\n  const form = $('Normalize and Check').first().json;\n  const get = (name) => { const v = form[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(form).find(k => k.trim() === name); return key !== undefined ? form[key] : undefined; };\n  return [{ json: { hasError: true, errorMessage: err.message, bookingUid: get('Booking ID') || 'unknown', fixedCleanerId: get('Cleaner ID') || '', submissionTimestamp: new Date().toISOString() } }];\n}"
+      }
+    },
+    {
+      "id": "d3c9b45f-e6e2-4584-9f19-b2f99cbe3222",
+      "name": "ParseAndValidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// ParseAndValidate: full URL, lat,lng, or DMS.\ntry {\n  const item = $('Normalize and Check').first().json;\n  const get = (name) => {\n    const v = item[name];\n    if (v !== undefined && v !== null) return v;\n    const key = Object.keys(item).find(k => k.trim() === name);\n    return key !== undefined ? item[key] : undefined;\n  };\n  const bookingUid = get('Booking ID');\n  const fixedCleanerId = get('Cleaner ID');\n  const confirmArrival = (get('Confirm Arrival') ?? '').toString().trim();\n  const mapsLink = (item.captureLocation != null ? item.captureLocation : get('Capture Location') ?? '').toString().trim();\n  if (!confirmArrival || confirmArrival.toLowerCase() !== 'yes') throw new Error('Arrival not confirmed');\n  if (!mapsLink) throw new Error('Location link missing');\n\n  function parseLatLngFromString(str) {\n    const latLngRegex = /(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/;\n    const m = str.match(latLngRegex);\n    if (m) return { lat: m[1], lng: m[2] };\n    const dmsRegex = /(\\d+)[\\u00b0\\u00ba]\\s*(\\d+)['′]\\s*([\\d.]+)[\"″]?\\s*([NS])\\s*(\\d+)[\\u00b0\\u00ba]\\s*(\\d+)['′]\\s*([\\d.]+)[\"″]?\\s*([EW])/i;\n    const dms = str.match(dmsRegex);\n    if (!dms) return null;\n    const latSign = dms[4].toUpperCase() === 'S' ? -1 : 1;\n    const lngSign = dms[8].toUpperCase() === 'W' ? -1 : 1;\n    const lat = latSign * (parseInt(dms[1],10) + parseInt(dms[2],10)/60 + parseFloat(dms[3])/3600);\n    const lng = lngSign * (parseInt(dms[5],10) + parseInt(dms[6],10)/60 + parseFloat(dms[7])/3600);\n    return { lat: String(lat), lng: String(lng) };\n  }\n  const parsed = parseLatLngFromString(mapsLink);\n  if (!parsed) throw new Error('Invalid Google Maps link format: could not find coordinates.');\n  return [{ json: { bookingUid, fixedCleanerId, gpsLat: parsed.lat, gpsLng: parsed.lng, submissionTimestamp: new Date().toISOString(), processingStatus: 'PENDING', resultMessage: '', processedAt: '', hasError: false } }];\n} catch (err) {\n  const item = $('Normalize and Check').first().json;\n  const get = (name) => { const v = item[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(item).find(k => k.trim() === name); return key !== undefined ? item[key] : undefined; };\n  return [{ json: { hasError: true, errorMessage: err.message, bookingUid: get('Booking ID') || 'unknown', fixedCleanerId: get('Cleaner ID') || '', submissionTimestamp: new Date().toISOString() } }];\n}"
+      }
+    },
+    {
+      "id": "8efd1680-1300-4dc4-b4ff-8e3de7cc4202",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "err-check",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "336803bd-a9ba-46a6-8285-a9caa478c1d2",
+      "name": "Lookup Existing ClockIn",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "alwaysOutputData": true,
+      "position": [
+        1480,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1402437116,
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            },
+            {
+              "lookupColumn": "processingStatus",
+              "lookupValue": "APPROVED"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5d028ffa-fe78-41e5-8924-045920b9e89f",
+      "name": "Reject If Already Approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const existing = $input.all();\nlet parsed;\nlet parsedFromShortLink;\nlet parsedFromDirect;\ntry { parsedFromShortLink = $('Parse Short Link Response').first().json; } catch (_) {}\ntry { parsedFromDirect = $('ParseAndValidate').first().json; } catch (_) {}\n\nif (parsedFromShortLink && parsedFromDirect) {\n  const tsA = new Date(parsedFromShortLink.submissionTimestamp || 0).getTime();\n  const tsB = new Date(parsedFromDirect.submissionTimestamp || 0).getTime();\n  parsed = tsA >= tsB ? parsedFromShortLink : parsedFromDirect;\n} else {\n  parsed = parsedFromShortLink || parsedFromDirect;\n}\nif (!parsed) throw new Error('Missing parsed submission');\n\nconst hasApproved = existing.some(i =>\n  (i.json?.processingStatus ?? '').toString().trim() === 'APPROVED');\nif (hasApproved) return [{ json: { skipInsert: true, bookingUid: parsed.bookingUid } }];\nreturn [{ json: { ...parsed, skipInsert: false } }];"
+      }
+    },
+    {
+      "id": "1ed4cf51-d7a1-4b7d-91c9-c7b9fd105156",
+      "name": "Should Insert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "do-insert",
+              "leftValue": "={{ $json.skipInsert }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aeb1bdfd-0521-4e04-960f-faa499cb673c",
+      "name": "Insert Structured Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1402437116,
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleanerIdFromForm": "={{ $json.fixedCleanerId }}",
+            "gpsLat": "={{ $json.gpsLat }}",
+            "gpsLng": "={{ $json.gpsLng }}",
+            "submissionTimestamp": "={{ $json.submissionTimestamp }}",
+            "processingStatus": "={{ $json.processingStatus }}",
+            "resultMessage": "={{ $json.resultMessage }}",
+            "processedAt": "={{ $json.processedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gpsLat",
+              "displayName": "gpsLat",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gpsLng",
+              "displayName": "gpsLng",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submissionTimestamp",
+              "displayName": "submissionTimestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processingStatus",
+              "displayName": "processingStatus",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultMessage",
+              "displayName": "resultMessage",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processedAt",
+              "displayName": "processedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "24e10540-5487-4614-a0e4-57ab47b18579",
+      "name": "Resolve Recipient",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1480,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const ADMIN_EMAIL = 'bgmazak123@gmail.com';\nconst fixedCleanerId = $json.fixedCleanerId || '';\nconst errorMessage = $json.errorMessage || 'Unknown error';\nconst bookingUid = $json.bookingUid || 'unknown';\n\nconst cleanerMap = {\n  '218jieksiei20iw0-ks2kwi219':      { email: 'bgmazak123@gmail.com',             name: 'Usman' },\n  'iwshwh38e8jsij28e892js21j2':      { email: 'nomiads222@gmail.com',             name: 'Nouman' },\n  'iwshwh3eeeesij28e892js21j2':      { email: 'noumanyounask@gmail.com',          name: 'Ali' },\n  'iwshwh3eeeeansaksjasjasjajs':     { email: 'office@daydrinkingproperties.com', name: 'David Schmutz' },\n  'jsljdjldjsljdjsdjsjdxmmxmxmxks':  { email: 'Kelly@daydrinkingproperties.com',  name: 'Kelly Williamson' },\n  'eb68f11d-c077-409b-a3':           { email: 'sdrenske86@gmail.com',             name: 'Sarah Drenske' },\n  'jsljdjldjsljdjsc2-ba96d3bf8af2':  { email: 'hollie.featherstone@gmail.com',    name: 'Hollie Featherstone' }\n};\n\nlet recipientEmail = ADMIN_EMAIL;\nlet recipientName = 'Admin';\nif (fixedCleanerId && cleanerMap[fixedCleanerId]) {\n  recipientEmail = cleanerMap[fixedCleanerId].email;\n  recipientName  = cleanerMap[fixedCleanerId].name;\n}\nreturn [{ json: { recipientEmail, recipientName, errorMessage, bookingUid, fixedCleanerId, submissionTimestamp: $json.submissionTimestamp || new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "b5bac028-fcbd-4175-a40a-18ca4dfeabbb",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "onError": "continueRegularOutput",
+      "position": [
+        1720,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={\"contents\":[{\"parts\":[{\"text\":\"You are an error message simplifier for a cleaning company automated system. A cleaner submitted a clock-in form and the system encountered an error. Explain the error in simple, friendly language that a cleaner can understand. Keep it to 2-3 sentences max. No technical jargon. If the error is about coordinates or GPS, say the location was not recognized please go under 100 meter radius of the property. If about arrival confirmation, say they need to confirm arrival. Always suggest what they can do to fix it. Original error: {{ $json.errorMessage }} Booking ID: {{ $json.bookingUid }} Cleaner: {{ $json.recipientName }} Write the simplified message only.\"}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":200}}",
+        "batching": {}
+      }
+    },
+    {
+      "id": "f70de53f-7618-4ed2-aa04-60269c5fee4e",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        200
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "G4BlsVg8cIwBbbbD",
+          "name": "Usman2Account"
+        }
+      },
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "9986e7d5-a518-45fb-a4e5-b50ac49174ff",
+      "name": "Extract Simplified Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const prev = $('Resolve Recipient').first().json;\nconst geminiResp = $input.first().json;\nlet simplifiedError = prev.errorMessage;\ntry { simplifiedError = geminiResp.candidates[0].content.parts[0].text.trim(); } catch (e) {}\nreturn [{ json: { ...prev, simplifiedError } }];"
+      }
+    },
+    {
+      "id": "99d6b5c2-745b-4718-951b-b97cd51ed8bc",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6sr232YN6z3c4tiW",
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "={{ $json.recipientEmail }}",
+        "subject": "=Clock-In Error — Booking {{ $json.bookingUid }}",
+        "emailType": "text",
+        "message": "={{ $('Basic LLM Chain').item.json.text }}\n\n— Cleaning Operations System",
+        "options": {}
+      }
+    },
+    {
+      "id": "6bba6d28-0ced-4807-a8f1-6b06c347058c",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2440,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"message\": \"Clock-in submitted successfully\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "4d0d608d-65e8-4c90-969f-4dfffb77a933",
+      "name": "Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2440,
+        500
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"skipped\",\n  \"message\": \"Clock-in already approved for this booking\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "acd7e1b8-c519-42f9-b5ce-63a6c3a5deae",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2440,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"{{ $json.simplifiedError || $json.errorMessage || 'Unknown error' }}\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "32cc4f74-a073-4d15-990a-af06002f66df",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -140
+      ],
+      "parameters": {
+        "width": 800,
+        "height": 260,
+        "content": "## Workflow 3W — Clock-In Ingestion (Webhook)\n\n**Replaces Workflow 3** (Google Sheets Trigger version).\nReceives POST from React Clock-In page at `/webhook/clockin`.\n\n**Flow:** Webhook → Normalize → Append Raw (audit) → GPS parse → Duplicate check → Insert to ClockInSubmissions\n\n**Response codes:**\n- 200 `{status: 'success'}` — inserted\n- 200 `{status: 'skipped'}` — duplicate (already approved)\n- 400 `{status: 'error'}` — validation failed + error email sent"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Check": {
+      "main": [
+        [
+          {
+            "node": "Is Short Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Short Link?": {
+      "main": [
+        [
+          {
+            "node": "Resolve Short Link",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ParseAndValidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Short Link": {
+      "main": [
+        [
+          {
+            "node": "Parse Short Link Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Short Link Response": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseAndValidate": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Resolve Recipient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Existing ClockIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Recipient": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Extract Simplified Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Simplified Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Existing ClockIn": {
+      "main": [
+        [
+          {
+            "node": "Reject If Already Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject If Already Approved": {
+      "main": [
+        [
+          {
+            "node": "Should Insert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Insert?": {
+      "main": [
+        [
+          {
+            "node": "Insert Structured Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Structured Row": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

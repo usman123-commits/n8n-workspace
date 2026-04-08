@@ -220,7 +220,9 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync | — |
 | `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | — |
 | `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | — |
+| `qIV56v4P8klISyR2` | Workflow 3W – Clock-In Ingestion (Webhook) | Webhook POST `/webhook/clockin` |
 | `VTlIwLr3cK896sLO` | Workflow 4 – Checkout Ingestion | Google Sheets Trigger (RawCheckoutResponses) |
+| `ptUTUMasJXbVzm2Q` | Workflow 4W – Checkout Ingestion (Webhook) | Webhook POST `/webhook/checkout` |
 | `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) |
 | `7X0QKeFueWTdz0GW` | Workflow 5 – Payroll Processing | Schedule (daily 02:00 UTC) |
 
