@@ -1,0 +1,207 @@
+{
+    "name": "Workflow 2C \u2013 Offer Timeout Checker",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 10
+                        }
+                    ]
+                }
+            },
+            "id": "20c00001-bbbb-4ccc-dddd-ee0000000001",
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.3,
+            "position": [0, 0]
+        },
+        {
+            "parameters": {
+                "content": "## Workflow 2C \u2013 Offer Timeout Checker\n\n**Schedule:** Every 10 minutes\n**Timeout:** 1 hour (configurable in Filter Expired node)\n\nFinds jobs with status=OFFERED where offeredAt is older than 1 hour.\nTreats timeout as a decline: adds cleaner to declinedBy, resets to PENDING.\nWorkflow 2 then picks it up and offers to the next available cleaner.\nIf all cleaners exhausted, Workflow 2 sets NEEDS_MANUAL_ASSIGNMENT.",
+                "height": 260,
+                "width": 360
+            },
+            "id": "20c00002-bbbb-4ccc-dddd-ee0000000002",
+            "name": "Sticky Note",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [-200, -360]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "filtersUI": {
+                    "values": [
+                        {
+                            "lookupColumn": "status",
+                            "lookupValue": "OFFERED"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "20c00003-bbbb-4ccc-dddd-ee0000000003",
+            "name": "Read Offered Jobs",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [240, 0],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Keep only OFFERED jobs where offeredAt is older than TIMEOUT_MINUTES.\nconst TIMEOUT_MINUTES = 60; // 1 hour\nconst now = Date.now();\nconst items = $input.all();\nconst expired = items.filter(item => {\n  const j = item.json || {};\n  const status = (j.status || '').toString().trim();\n  if (status !== 'OFFERED') return false;\n  const offeredAt = (j.offeredAt || '').toString().trim();\n  if (!offeredAt) return false;\n  const offeredTime = new Date(offeredAt).getTime();\n  if (isNaN(offeredTime)) return false;\n  const elapsedMs = now - offeredTime;\n  return elapsedMs > TIMEOUT_MINUTES * 60 * 1000;\n});\nreturn expired.length > 0 ? expired : [];"
+            },
+            "id": "20c00004-bbbb-4ccc-dddd-ee0000000004",
+            "name": "Filter Expired",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [480, 0],
+            "notes": "TIMEOUT_MINUTES = 60. Change this value to adjust the offer expiry window."
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "20c00005-bbbb-4ccc-dddd-ee0000000005",
+            "name": "Split In Batches",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [720, 0],
+            "notes": "Process one timed-out offer at a time to avoid write conflicts."
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $input.first().json;\nconst offeredTo = (job.offeredTo || '').toString().trim();\nconst existingDeclined = (job.declinedBy || '').toString().trim();\nconst declinedList = existingDeclined ? existingDeclined.split(',').map(s => s.trim()).filter(Boolean) : [];\nif (offeredTo && !declinedList.includes(offeredTo)) {\n  declinedList.push(offeredTo);\n}\nreturn [{ json: {\n  bookingUid: job.bookingUid,\n  declinedBy: declinedList.join(','),\n  propertyName: job.propertyName || job.propertyUid || '',\n  offeredTo: offeredTo,\n  scheduledCleaningTimeUTC: job.scheduledCleaningTimeUTC || ''\n} }];"
+            },
+            "id": "20c00006-bbbb-4ccc-dddd-ee0000000006",
+            "name": "Build Timeout Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [960, 0],
+            "notes": "Adds the timed-out cleaner (offeredTo) to declinedBy list."
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "status": "PENDING",
+                        "cleanerId": " ",
+                        "assignedCleaner": " ",
+                        "assignedAt": " ",
+                        "offeredTo": " ",
+                        "offeredAt": " ",
+                        "declinedBy": "={{ $json.declinedBy }}",
+                        "processingFlag": " "
+                    },
+                    "matchingColumns": ["bookingUid"],
+                    "schema": [
+                        {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "status", "displayName": "status", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "cleanerId", "displayName": "cleanerId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignedCleaner", "displayName": "assignedCleaner", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignedAt", "displayName": "assignedAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "offeredTo", "displayName": "offeredTo", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "offeredAt", "displayName": "offeredAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "declinedBy", "displayName": "declinedBy", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "processingFlag", "displayName": "processingFlag", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "id": "20c00007-bbbb-4ccc-dddd-ee0000000007",
+            "name": "Reset Job to PENDING",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [1200, 0],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            },
+            "notes": "Resets to PENDING so Workflow 2 picks it up again and offers to the next cleaner (skipping those in declinedBy)."
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {"node": "Read Offered Jobs", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Read Offered Jobs": {
+            "main": [
+                [
+                    {"node": "Filter Expired", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Filter Expired": {
+            "main": [
+                [
+                    {"node": "Split In Batches", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Split In Batches": {
+            "main": [
+                [],
+                [
+                    {"node": "Build Timeout Data", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Build Timeout Data": {
+            "main": [
+                [
+                    {"node": "Reset Job to PENDING", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Reset Job to PENDING": {
+            "main": [
+                [
+                    {"node": "Split In Batches", "type": "main", "index": 0}
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "timezone": "Asia/Karachi"
+    },
+    "active": false
+}

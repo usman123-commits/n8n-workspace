@@ -1,0 +1,792 @@
+{
+    "name": "Workflow 2B \u2013 Job Response Handler",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "GET",
+                "path": "job-response",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "10b00001-aaaa-4bbb-cccc-dd0000000001",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [0, 0],
+            "webhookId": "a2b3c4d5-e6f7-4a8b-9c0d-e1f2a3b4c5d6"
+        },
+        {
+            "parameters": {
+                "content": "## Workflow 2B \u2013 Job Response Handler\n\n**Webhook:** GET /webhook/job-response\n**Query params:** bookingUid, cleanerId, response (accept|decline)\n\nCalled when a cleaner clicks Accept or Decline in their offer email.\n\n- **Accept:** creates calendar events, generates clock-in/out links, sends confirmation email, sets status=ASSIGNED\n- **Decline:** adds cleaner to declinedBy, resets status=PENDING so Workflow 2 offers to next cleaner\n- **Error:** invalid params, job not OFFERED, or wrong cleaner",
+                "height": 340,
+                "width": 360
+            },
+            "id": "10b00002-aaaa-4bbb-cccc-dd0000000002",
+            "name": "Sticky Note",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [-200, -500]
+        },
+        {
+            "parameters": {
+                "jsCode": "const item = $input.first().json;\nconst query = item.query || {};\nconst bookingUid = (query.bookingUid || '').toString().trim();\nconst cleanerId = (query.cleanerId || '').toString().trim();\nconst response = (query.response || '').toString().trim().toLowerCase();\nreturn [{ json: { bookingUid, cleanerId, response } }];"
+            },
+            "id": "10b00003-aaaa-4bbb-cccc-dd0000000003",
+            "name": "Parse Request",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [240, 0]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "filtersUI": {
+                    "values": [
+                        {
+                            "lookupColumn": "bookingUid",
+                            "lookupValue": "={{ $json.bookingUid }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "10b00004-aaaa-4bbb-cccc-dd0000000004",
+            "name": "Read Job",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [480, 0],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const params = $('Parse Request').first().json;\nconst { bookingUid, cleanerId, response } = params;\n\nif (!bookingUid || !cleanerId || !response) {\n  return [{ json: { _action: 'error', _errorMsg: 'Missing required parameters (bookingUid, cleanerId, response).' } }];\n}\nif (response !== 'accept' && response !== 'decline') {\n  return [{ json: { _action: 'error', _errorMsg: 'Response must be accept or decline.' } }];\n}\n\nconst jobItems = $input.all();\nif (jobItems.length === 0 || !jobItems[0].json?.bookingUid) {\n  return [{ json: { _action: 'error', _errorMsg: 'Job not found for bookingUid: ' + bookingUid } }];\n}\n\nconst job = jobItems[0].json;\nconst status = (job.status || '').toString().trim();\nconst offeredTo = (job.offeredTo || '').toString().trim();\n\nif (status === 'ASSIGNED') {\n  return [{ json: { _action: 'error', _errorMsg: 'This job has already been accepted.' } }];\n}\nif (status !== 'OFFERED') {\n  return [{ json: { _action: 'error', _errorMsg: 'This job is no longer available (status: ' + status + ').' } }];\n}\nif (offeredTo !== cleanerId) {\n  return [{ json: { _action: 'error', _errorMsg: 'This offer was not sent to you.' } }];\n}\n\nreturn [{ json: { ...job, cleanerId, _action: response } }];"
+            },
+            "id": "10b00005-aaaa-4bbb-cccc-dd0000000005",
+            "name": "Validate & Route",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [720, 0]
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json._action }}",
+                                        "rightValue": "accept",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ]
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "Accept"
+                        },
+                        {
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json._action }}",
+                                        "rightValue": "decline",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ]
+                            },
+                            "renameOutput": true,
+                            "outputLabel": "Decline"
+                        }
+                    ]
+                },
+                "options": {
+                    "fallbackOutput": "extra"
+                }
+            },
+            "id": "10b00006-aaaa-4bbb-cccc-dd0000000006",
+            "name": "Switch",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [960, 0]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "1920390373",
+                    "mode": "id"
+                },
+                "filtersUI": {
+                    "values": [
+                        {
+                            "lookupColumn": "cleanerId",
+                            "lookupValue": "={{ $('Validate & Route').first().json.cleanerId }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "10b00007-aaaa-4bbb-cccc-dd0000000007",
+            "name": "Read Cleaner Row",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [1200, -400],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "766791868",
+                    "mode": "id"
+                },
+                "filtersUI": {
+                    "values": [
+                        {
+                            "lookupColumn": "propertyUid",
+                            "lookupValue": "={{ $('Validate & Route').first().json.propertyUid }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "10b00008-aaaa-4bbb-cccc-dd0000000008",
+            "name": "Read Property Row",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [1440, -400],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "569949670",
+                    "mode": "id"
+                },
+                "filtersUI": {
+                    "values": [
+                        {
+                            "lookupColumn": "bookingUid",
+                            "lookupValue": "={{ $('Validate & Route').first().json.bookingUid }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "10b00009-aaaa-4bbb-cccc-dd0000000009",
+            "name": "Lookup Reservation",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [1680, -400],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $('Validate & Route').first().json;\nconst cleanerItems = $('Read Cleaner Row').all();\nconst propertyItems = $('Read Property Row').all();\nconst reservationItems = $input.all();\n\nconst cleaner = cleanerItems.length > 0 ? cleanerItems[0].json : {};\nconst property = propertyItems.length > 0 ? propertyItems[0].json : {};\nconst reservation = reservationItems.length > 0 && reservationItems[0].json?.bookingUid ? reservationItems[0].json : {};\n\nconst propertyName = (property.propertyName || reservation.propertyName || job.propertyUid || '').toString().trim();\nconst address = (property.address || reservation.address || 'Address TBD').toString().trim();\nconst fixedCleanerId = (property.fixedCleanerId || '').toString().trim();\nconst isFixed = fixedCleanerId !== '' && fixedCleanerId === job.cleanerId;\n\nreturn [{ json: {\n  ...job,\n  cleanerEmail: cleaner.email || '',\n  cleanerCalendarId: cleaner.calendarId || '',\n  cleanerName: cleaner.name || '',\n  cleanerContact: cleaner.phone || '',\n  propertyName,\n  address,\n  adultCount: reservation.adultCount || '0',\n  childrenCount: reservation.childrenCount || '0',\n  guestName: reservation.guestName || '',\n  _isFixedAssignment: isFixed,\n  assignedAt: new Date().toISOString()\n} }];"
+            },
+            "id": "10b0000a-aaaa-4bbb-cccc-dd000000000a",
+            "name": "Build Accept Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1920, -400]
+        },
+        {
+            "parameters": {
+                "jsCode": "const BASE_URL = 'https://n8n-forms.vercel.app';\nconst bookingUid = $json.bookingUid;\nconst cleanerId = $json.cleanerId;\nconst params = 'bookingId=' + encodeURIComponent(bookingUid || '') + '&cleanerId=' + encodeURIComponent(cleanerId || '');\nconst clockInLink = BASE_URL + '/clockin?' + params;\nconst checkoutLink = BASE_URL + '/checkout?' + params;\nreturn [{ json: { ...$input.first().json, clockInLink, checkoutLink } }];"
+            },
+            "id": "10b0000b-aaaa-4bbb-cccc-dd000000000b",
+            "name": "Generate Links",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [2160, -400]
+        },
+        {
+            "parameters": {
+                "jsCode": "const DURATION_HOURS = 3;\nconst startTime = ($json.scheduledCleaningTimeUTC || '').toString().trim();\nif (!startTime) throw new Error('Missing scheduledCleaningTimeUTC');\nconst startDate = new Date(startTime);\nif (isNaN(startDate.getTime())) throw new Error('Invalid scheduledCleaningTimeUTC');\nconst endDate = new Date(startDate.getTime() + DURATION_HOURS * 3600 * 1000);\nreturn [{ json: { ...$input.first().json, startTime, endTime: endDate.toISOString(), durationHours: DURATION_HOURS } }];"
+            },
+            "id": "10b0000c-aaaa-4bbb-cccc-dd000000000c",
+            "name": "Calculate Time",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [2400, -400]
+        },
+        {
+            "parameters": {
+                "calendar": {
+                    "__rl": true,
+                    "value": "usman2acountf@gmail.com",
+                    "mode": "list",
+                    "cachedResultName": "usman2acountf@gmail.com"
+                },
+                "start": "={{ $json.startTime }}",
+                "end": "={{ $json.endTime }}",
+                "additionalFields": {
+                    "summary": "=Cleaning \u2013 {{ $json.propertyName }}",
+                    "description": "=Booking: {{ $json.bookingUid }}\nCleaner: {{ $json.cleanerName }}\nProperty: {{ $json.propertyName }}\nAddress: {{ $json.address }}"
+                }
+            },
+            "id": "10b0000d-aaaa-4bbb-cccc-dd000000000d",
+            "name": "Create Admin Calendar Event",
+            "type": "n8n-nodes-base.googleCalendar",
+            "typeVersion": 1.2,
+            "position": [2640, -400],
+            "credentials": {
+                "googleCalendarOAuth2Api": {
+                    "id": "zieubUQMxpWLThGP",
+                    "name": "Google Calendar account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "calendar": {
+                    "__rl": true,
+                    "value": "={{ $('Build Accept Data').first().json.cleanerEmail }}",
+                    "mode": "id"
+                },
+                "start": "={{ $('Calculate Time').first().json.startTime }}",
+                "end": "={{ $('Calculate Time').first().json.endTime }}",
+                "additionalFields": {
+                    "summary": "=Cleaning \u2013 {{ $('Calculate Time').first().json.propertyName }}",
+                    "description": "=Cleaning Assignment\n\nProperty: {{ $('Calculate Time').first().json.propertyName }}\nAddress: {{ $('Calculate Time').first().json.address }}\n\nStep 1 \u2013 Clock In:\n{{ $('Generate Links').first().json.clockInLink }}\n\nStep 2 \u2013 Checkout:\n{{ $('Generate Links').first().json.checkoutLink }}"
+                }
+            },
+            "id": "10b0000e-aaaa-4bbb-cccc-dd000000000e",
+            "name": "Create Cleaner Calendar Event",
+            "type": "n8n-nodes-base.googleCalendar",
+            "typeVersion": 1.2,
+            "position": [2880, -400],
+            "credentials": {
+                "googleCalendarOAuth2Api": {
+                    "id": "zieubUQMxpWLThGP",
+                    "name": "Google Calendar account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $('Calculate Time').first().json;\nconst cleanerEvent = $input.first().json;\nconst cleanerEventId = cleanerEvent?.id || '';\nconst adminEvent = $('Create Admin Calendar Event').first()?.json || {};\nconst adminEventId = adminEvent?.id || '';\nreturn [{ json: { ...job, calendarEventId: cleanerEventId, adminCalendarEventId: adminEventId } }];"
+            },
+            "id": "10b0000f-aaaa-4bbb-cccc-dd000000000f",
+            "name": "Prepare Event IDs",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [3120, -400]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "status": "ASSIGNED",
+                        "calendarStatus": "CREATED",
+                        "calendarEventId": "={{ $json.calendarEventId }}",
+                        "adminCalendarEventId": "={{ $json.adminCalendarEventId }}",
+                        "calendarId": "={{ $('Build Accept Data').first().json.cleanerCalendarId }}",
+                        "clockInLink": "={{ $('Generate Links').first().json.clockInLink }}",
+                        "checkoutLink": "={{ $('Generate Links').first().json.checkoutLink }}",
+                        "assignedAt": "={{ $('Build Accept Data').first().json.assignedAt }}",
+                        "offeredTo": " ",
+                        "offeredAt": " ",
+                        "processingFlag": " "
+                    },
+                    "matchingColumns": ["bookingUid"],
+                    "schema": [
+                        {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "status", "displayName": "status", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "calendarStatus", "displayName": "calendarStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "calendarEventId", "displayName": "calendarEventId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "adminCalendarEventId", "displayName": "adminCalendarEventId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "calendarId", "displayName": "calendarId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "clockInLink", "displayName": "clockInLink", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "checkoutLink", "displayName": "checkoutLink", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignedAt", "displayName": "assignedAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "offeredTo", "displayName": "offeredTo", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "offeredAt", "displayName": "offeredAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "processingFlag", "displayName": "processingFlag", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "id": "10b00010-aaaa-4bbb-cccc-dd0000000010",
+            "name": "Update Job Accepted",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [3360, -400],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "=<!DOCTYPE html><html><head><title>Job Accepted</title><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body style=\"font-family:Arial,sans-serif;text-align:center;padding:40px;background:#f0fdf4\"><div style=\"max-width:400px;margin:auto;background:white;padding:30px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)\"><h1 style=\"color:#16a34a;font-size:28px\">Job Accepted!</h1><p style=\"color:#333;font-size:16px\">You will receive a confirmation email with all the details shortly.</p><p style=\"color:#666;font-size:14px\">You can close this page.</p></div></body></html>",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "10b00011-aaaa-4bbb-cccc-dd0000000011",
+            "name": "Respond Accepted",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [3600, -400]
+        },
+        {
+            "parameters": {
+                "sendTo": "={{ $('Build Accept Data').first().json.cleanerEmail }}",
+                "subject": "=Cleaning Confirmed \u2013 {{ $('Build Accept Data').first().json.propertyName }}",
+                "emailType": "text",
+                "message": "=You have accepted a cleaning job.\n\nProperty: {{ $('Build Accept Data').first().json.propertyName }}\nAddress: {{ $('Build Accept Data').first().json.address }}\n\nDate: {{ DateTime.fromISO($('Calculate Time').first().json.startTime, { zone: 'utc' }).toFormat('yyyy-MM-dd') }}\nTime: {{ DateTime.fromISO($('Calculate Time').first().json.startTime, { zone: 'utc' }).toFormat('HH:mm') }} - {{ DateTime.fromISO($('Calculate Time').first().json.endTime, { zone: 'utc' }).toFormat('HH:mm') }} UTC\n\nGuest Count: {{ parseInt($('Build Accept Data').first().json.adultCount || '0') + parseInt($('Build Accept Data').first().json.childrenCount || '0') }}\nBooking Reference: {{ $('Build Accept Data').first().json.bookingUid }}\n\nStep 1 \u2013 Clock In (on arrival):\n{{ $('Generate Links').first().json.clockInLink }}\n\nStep 2 \u2013 Checkout (when done):\n{{ $('Generate Links').first().json.checkoutLink }}\n\nThis email serves as official assignment confirmation.",
+                "options": {}
+            },
+            "id": "10b00012-aaaa-4bbb-cccc-dd0000000012",
+            "name": "Send Confirmation Email",
+            "type": "n8n-nodes-base.gmail",
+            "typeVersion": 2.1,
+            "position": [3840, -400],
+            "webhookId": "b3c4d5e6-f7a8-4b9c-0d1e-f2a3b4c5d6e7",
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "6sr232YN6z3c4tiW",
+                    "name": "Gmail account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $('Build Accept Data').first().json;\nconst cleanerId = (job.cleanerId || '').toString().trim();\nconst cleaner = $('Read Cleaner Row').first()?.json || {};\nconst rawCount = cleaner?.assignmentCount;\nconst parsed = (rawCount !== undefined && rawCount !== null && String(rawCount).trim() !== '') ? parseInt(String(rawCount).trim(), 10) : 0;\nconst safeCount = isNaN(parsed) ? 0 : parsed;\nconst now = new Date();\nconst nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));\nreturn [{ json: {\n  cleanerId,\n  assignmentCount: String(job._isFixedAssignment ? safeCount : safeCount + 1),\n  assignmentCountResetDateUTC: nextReset.toISOString()\n} }];"
+            },
+            "id": "10b00013-aaaa-4bbb-cccc-dd0000000013",
+            "name": "Compute Count",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [4080, -400]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "1920390373",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "cleanerId": "={{ $json.cleanerId }}",
+                        "assignmentCount": "={{ $json.assignmentCount }}",
+                        "assignmentCountResetDateUTC": "={{ $json.assignmentCountResetDateUTC }}"
+                    },
+                    "matchingColumns": ["cleanerId"],
+                    "schema": [
+                        {"id": "cleanerId", "displayName": "cleanerId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignmentCount", "displayName": "assignmentCount", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignmentCountResetDateUTC", "displayName": "assignmentCountResetDateUTC", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "id": "10b00014-aaaa-4bbb-cccc-dd0000000014",
+            "name": "Update Count",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [4320, -400],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "569949670",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $('Validate & Route').first().json.bookingUid }}",
+                        "cleaningStatus": "ASSIGNED"
+                    },
+                    "matchingColumns": ["bookingUid"],
+                    "schema": [
+                        {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "cleaningStatus", "displayName": "cleaningStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "id": "10b00015-aaaa-4bbb-cccc-dd0000000015",
+            "name": "Update Reservation Status",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [4560, -400],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const job = $('Validate & Route').first().json;\nconst existingDeclined = (job.declinedBy || '').toString().trim();\nconst cleanerId = (job.cleanerId || '').toString().trim();\nconst declinedList = existingDeclined ? existingDeclined.split(',').map(s => s.trim()).filter(Boolean) : [];\nif (!declinedList.includes(cleanerId)) {\n  declinedList.push(cleanerId);\n}\nreturn [{ json: {\n  bookingUid: job.bookingUid,\n  declinedBy: declinedList.join(','),\n  propertyName: job.propertyName || job.propertyUid || ''\n} }];"
+            },
+            "id": "10b00016-aaaa-4bbb-cccc-dd0000000016",
+            "name": "Build Decline Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1200, 0]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                    "mode": "id"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "2047086003",
+                    "mode": "id"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "bookingUid": "={{ $json.bookingUid }}",
+                        "status": "PENDING",
+                        "cleanerId": " ",
+                        "assignedCleaner": " ",
+                        "assignedAt": " ",
+                        "offeredTo": " ",
+                        "offeredAt": " ",
+                        "declinedBy": "={{ $json.declinedBy }}",
+                        "processingFlag": " "
+                    },
+                    "matchingColumns": ["bookingUid"],
+                    "schema": [
+                        {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "status", "displayName": "status", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "cleanerId", "displayName": "cleanerId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignedCleaner", "displayName": "assignedCleaner", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "assignedAt", "displayName": "assignedAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "offeredTo", "displayName": "offeredTo", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "offeredAt", "displayName": "offeredAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "declinedBy", "displayName": "declinedBy", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+                        {"id": "processingFlag", "displayName": "processingFlag", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "id": "10b00017-aaaa-4bbb-cccc-dd0000000017",
+            "name": "Update Job Declined",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.4,
+            "position": [1440, 0],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "q52dbWoN6OaKRDZO",
+                    "name": "Google Sheets account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "=<!DOCTYPE html><html><head><title>Job Declined</title><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body style=\"font-family:Arial,sans-serif;text-align:center;padding:40px;background:#fefce8\"><div style=\"max-width:400px;margin:auto;background:white;padding:30px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)\"><h1 style=\"color:#ca8a04;font-size:28px\">Job Declined</h1><p style=\"color:#333;font-size:16px\">This job will be offered to another cleaner.</p><p style=\"color:#666;font-size:14px\">You can close this page.</p></div></body></html>",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "10b00018-aaaa-4bbb-cccc-dd0000000018",
+            "name": "Respond Declined",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [1680, 0]
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "=<!DOCTYPE html><html><head><title>Error</title><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body style=\"font-family:Arial,sans-serif;text-align:center;padding:40px;background:#fef2f2\"><div style=\"max-width:400px;margin:auto;background:white;padding:30px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)\"><h1 style=\"color:#dc2626;font-size:28px\">Error</h1><p style=\"color:#333;font-size:16px\">{{ $json._errorMsg || 'An unexpected error occurred.' }}</p><p style=\"color:#666;font-size:14px\">Please contact your supervisor if this issue persists.</p></div></body></html>",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "10b00019-aaaa-4bbb-cccc-dd0000000019",
+            "name": "Respond Error",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [1200, 400]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {"node": "Parse Request", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Parse Request": {
+            "main": [
+                [
+                    {"node": "Read Job", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Read Job": {
+            "main": [
+                [
+                    {"node": "Validate & Route", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Validate & Route": {
+            "main": [
+                [
+                    {"node": "Switch", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Switch": {
+            "main": [
+                [
+                    {"node": "Read Cleaner Row", "type": "main", "index": 0}
+                ],
+                [
+                    {"node": "Build Decline Data", "type": "main", "index": 0}
+                ],
+                [
+                    {"node": "Respond Error", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Read Cleaner Row": {
+            "main": [
+                [
+                    {"node": "Read Property Row", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Read Property Row": {
+            "main": [
+                [
+                    {"node": "Lookup Reservation", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Lookup Reservation": {
+            "main": [
+                [
+                    {"node": "Build Accept Data", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Build Accept Data": {
+            "main": [
+                [
+                    {"node": "Generate Links", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Generate Links": {
+            "main": [
+                [
+                    {"node": "Calculate Time", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Calculate Time": {
+            "main": [
+                [
+                    {"node": "Create Admin Calendar Event", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Create Admin Calendar Event": {
+            "main": [
+                [
+                    {"node": "Create Cleaner Calendar Event", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Create Cleaner Calendar Event": {
+            "main": [
+                [
+                    {"node": "Prepare Event IDs", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Prepare Event IDs": {
+            "main": [
+                [
+                    {"node": "Update Job Accepted", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Update Job Accepted": {
+            "main": [
+                [
+                    {"node": "Respond Accepted", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Respond Accepted": {
+            "main": [
+                [
+                    {"node": "Send Confirmation Email", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Send Confirmation Email": {
+            "main": [
+                [
+                    {"node": "Compute Count", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Compute Count": {
+            "main": [
+                [
+                    {"node": "Update Count", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Update Count": {
+            "main": [
+                [
+                    {"node": "Update Reservation Status", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Build Decline Data": {
+            "main": [
+                [
+                    {"node": "Update Job Declined", "type": "main", "index": 0}
+                ]
+            ]
+        },
+        "Update Job Declined": {
+            "main": [
+                [
+                    {"node": "Respond Declined", "type": "main", "index": 0}
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "timezone": "Asia/Karachi"
+    },
+    "active": false
+}
