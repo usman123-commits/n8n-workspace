@@ -100,7 +100,7 @@ System polls **CleaningJobs** tab.
 **Current logic (implemented):**
 
 - **Fixed assignment:** If the property's `fixedCleanerId` in the Properties tab is set, that cleaner is always assigned. `assignmentCount` is not incremented.
-- **Round-robin fallback:** If no fixed cleaner, all cleaners in CleanersProfile are checked for availability. A cleaner is unavailable if they have an existing ASSIGNED job with an overlapping `scheduledCleaningTimeUTC` window. From available cleaners, the one with the lowest `assignmentCount` is selected (tiebreak: alphabetical `cleanerId`).
+- **Round-robin fallback:** If no fixed cleaner, cleaners are checked for availability. A cleaner is unavailable if they have an existing ASSIGNED job with an overlapping `scheduledCleaningTimeUTC` window. **Cleaners who are fixed to any property (appear as `fixedCleanerId` on any Properties row) are excluded from this pool entirely** — they can only be assigned via the fixed path. From the remaining available cleaners, the one with the lowest `assignmentCount` is selected (tiebreak: alphabetical `cleanerId`).
 - **Reset logic:** If a cleaner's `assignmentCountResetDateUTC` has passed, their count is treated as 0 and reset to 0 on next assignment.
 
 **Future upgrade options:**
@@ -127,7 +127,7 @@ Create two events:
 Start: scheduledCleaningTimeUTC  
 End: start + 3 hours
 
-**Event description:** the workflow appends a "Clock-In Link" section containing the Google Form prefilled URL.
+**Event description:** the workflow appends "Clock-In Link" and "Checkout Link" sections containing the React app URLs (`https://n8n-forms.vercel.app/clockin?...` and `https://n8n-forms.vercel.app/checkout?...`).
 
 **Store:**
 calendarEventId (from cleaner calendar)
@@ -152,7 +152,8 @@ New Cleaning Assigned – [Property Name]
 - Guest Count
 - Booking Reference
 - Calendar Event Link
-- Clock-In Link (Google Form)
+- Clock-In Link (React page: `https://n8n-forms.vercel.app/clockin?bookingId=...&cleanerId=...`)
+- Checkout Link (React page: `https://n8n-forms.vercel.app/checkout?bookingId=...&cleanerId=...`)
 
 This acts as:
 
@@ -174,23 +175,25 @@ We use Google Forms.
 
 ## Step 3.1 – Start Cleaning (Clock In)
 
-Cleaner opens Google Form link.
+Cleaner opens the React clock-in page link sent in the assignment email.
 
-**Form collects:**
+**Page collects:**
 
-- Booking ID (pre-filled)
-- Cleaner ID (pre-filled)
+- Booking ID (pre-filled from URL query param)
+- Cleaner ID (pre-filled from URL query param)
 - Confirm Arrival (must be "Yes")
-- Capture Location (Google Maps link or coordinates captured by the device/form)
+- Capture Location (Google Maps link or coordinates)
 
 **System captures:**
 
-- Form submission timestamp (from the raw response row)
+- Submission timestamp (set client-side at submit)
 - GPS location from "Capture Location"
 
 **Processing pipeline (current implementation):**
 
-- Workflow 3 listens to new rows in `Form Responses 1`, uses **Split In Batches** (batch size 1) to process each new submission one-by-one, validates required fields, extracts lat/lng, and appends a normalized row into `ClockInSubmissions` with `processingStatus = PENDING` (duplicate protection: no insert if that booking already has an APPROVED row).
+- React page POSTs JSON to `POST /webhook/clockin` (Workflow 3W).
+- Workflow 3W normalizes fields (accepts React camelCase or form column names), detects short Google Maps links, resolves them via HTTP, validates required fields, checks for duplicates in `ClockInSubmissions`, and appends a normalized row with `processingStatus = PENDING`.
+- Replaced Google Forms + Workflow 3 (Google Sheets Trigger) — those are now inactive.
 - Workflow 3B polls `ClockInSubmissions` and processes **all** `PENDING` rows in each run (each item flows through Get Booking and validation; no extra loop needed):
   - Validates the cleaner is assigned to the booking (by comparing submission `cleanerId` with the assigned `cleanerId` in `CleaningJobs` for the same `bookingUid`).
   - Validates GPS radius (≤ 100m) using property coordinates from the **Properties** tab (lookup by `propertyUid`; sheet must have columns **`latitude`** and **`longitude`**).
@@ -210,15 +213,24 @@ status = "IN_PROGRESS"
 
 ## Step 3.2 – Finish Cleaning (Clock Out)
 
-⚠️ Not implemented yet.
+✅ Implemented — Workflow 4W (`ptUTUMasJXbVzm2Q`).
 
-We still need a dedicated workflow for clock-out handling (Phase 3.2). This will likely mirror clock-in:
+Cleaner opens the React checkout page link sent in the assignment email.
 
-- Accept a clock-out form submission (bookingUid, cleanerId, GPS)
-- Validate cleaner assignment
-- (Optional) validate radius
-- Write `clockOutTimeUTC`, `gpsClockOutLat`, `gpsClockOutLng`
-- Update `status = COMPLETED`
+**Page collects:**
+
+- Booking ID + Cleaner ID (pre-filled from URL)
+- Confirm Checkout (must be "Yes")
+- Capture Location (GPS)
+- Issue Reported? + issue details (type, description, photo via Cloudinary, priority)
+- Supply usage (per-item quantities)
+
+**Processing pipeline:**
+
+- React page POSTs JSON to `POST /webhook/checkout` (Workflow 4W).
+- Workflow 4W normalizes fields, resolves GPS, validates, checks duplicates in `CheckoutSubmissions`, then appends a PENDING row.
+- In parallel after insert: if issue reported → appends to `MaintenanceTickets`; if supplies used → appends rows to `SupplyUsageLog`.
+- Workflow 4B then validates the PENDING checkout row and updates `CleaningJobs.status = COMPLETED`.
 
 Now you have verified job duration.
 
