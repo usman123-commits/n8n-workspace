@@ -197,7 +197,7 @@
         },
         {
             "parameters": {
-                "jsCode": "// ASSIGN CLEANER \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d fixed property OR availability-based with round-robin tiebreak\nconst DURATION_HOURS = 3;\nconst item = $input.first().json;\nconst propertyUid = (item.propertyUid ?? '').toString().trim();\n\nconst properties   = Array.isArray(item._properties)      ? item._properties      : [];\nconst cleaners     = Array.isArray(item._cleanersProfile)  ? item._cleanersProfile : [];\nconst allJobs      = Array.isArray(item._allCleaningJobs)  ? item._allCleaningJobs : [];\n\nif (properties.length === 0) throw new Error('No Properties data. Ensure Read Properties ran.');\nif (cleaners.length === 0)   throw new Error('No CleanersProfile data. Ensure Read CleanersProfile ran.');\n\nconst get = (row, ...keys) => {\n  const j = row && (row.json !== undefined ? row.json : row);\n  if (!j || typeof j !== 'object') return '';\n  for (const k of keys) {\n    const v = j[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac Step 1: find property row \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\nconst propRow = properties.find(r => get(r, 'propertyUid') === propertyUid);\nif (!propRow) throw new Error(`No Properties row for propertyUid: ${propertyUid}.`);\n\nconst propertyNameFromSheet = get(propRow, 'propertyName');\nconst fixedCleanerId        = get(propRow, 'fixedCleanerId');\n\n// \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac Step 2: resolve cleaner \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d fixed or availability \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\nlet assignedCleanerId;\nlet isFixed = false;\n\nif (fixedCleanerId) {\n  // Fixed assignment \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d bypass availability check\n  assignedCleanerId = fixedCleanerId;\n  isFixed = true;\n} else {\n  // Availability-based assignment\n  const newStart = item.scheduledCleaningTimeUTC ? new Date(item.scheduledCleaningTimeUTC) : null;\n  if (!newStart || isNaN(newStart.getTime())) throw new Error('Missing or invalid scheduledCleaningTimeUTC on job.');\n  const newEnd = new Date(newStart.getTime() + DURATION_HOURS * 3600 * 1000);\n\n  // Collect busy cleaner IDs from ASSIGNED jobs that overlap with new job window\n  const busyCleanerIds = new Set();\n  for (const jobRow of allJobs) {\n    const j = jobRow?.json ?? jobRow;\n    const jStatus    = (j?.status ?? '').toString().trim();\n    const jCleanerId = (j?.cleanerId ?? '').toString().trim();\n    const jBookingUid = (j?.bookingUid ?? '').toString().trim();\n    // Skip: not ASSIGNED, no cleaner, or this is the same job\n    if (jStatus !== 'ASSIGNED') continue;\n    if (!jCleanerId) continue;\n    if (jBookingUid === (item.bookingUid ?? '').toString().trim()) continue;\n    // Skip if missing scheduledCleaningTimeUTC \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d treat as non-blocking\n    const startStr = (j?.scheduledCleaningTimeUTC ?? '').toString().trim();\n    if (!startStr) continue;\n    const existStart = new Date(startStr);\n    if (isNaN(existStart.getTime())) continue;\n    const existEnd = new Date(existStart.getTime() + DURATION_HOURS * 3600 * 1000);\n    // Standard interval overlap: existStart < newEnd AND existEnd > newStart\n    if (existStart < newEnd && existEnd > newStart) {\n      busyCleanerIds.add(jCleanerId);\n    }\n  }\n\n  // Build set of all fixed cleaners (assigned to a specific property)\n  const allFixedCleanerIds = new Set(\n    properties.map(r => get(r, 'fixedCleanerId')).filter(id => id !== '')\n  );\n\n  // Available cleaners = non-busy AND not fixed to another property\n  const availableCleaners = cleaners.filter(r => {\n    const cId = get(r, 'cleanerId');\n    return cId && !busyCleanerIds.has(cId) && !allFixedCleanerIds.has(cId);\n  });\n\n  if (availableCleaners.length === 0) {\n    // Signal no-cleaner-found \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d handled by downstream IF node\n    return [{ json: { ...item, _noCleanerAvailable: true, propertyName: propertyNameFromSheet || item.propertyName || propertyUid } }];\n  }\n\n  if (availableCleaners.length === 1) {\n    assignedCleanerId = get(availableCleaners[0], 'cleanerId');\n  } else {\n    // Multiple available \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d check reset then pick lowest assignmentCount\n    const now = new Date();\n    // Reset counts if any cleaner's resetDate has passed\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const resetDateStr = (j?.assignmentCountResetDateUTC ?? '').toString().trim();\n      if (resetDateStr) {\n        const resetDate = new Date(resetDateStr);\n        if (!isNaN(resetDate.getTime()) && now >= resetDate) {\n          // Mark for reset \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d actual sheet update done in Increment node\n          if (j) j._needsReset = true;\n        }\n      }\n    }\n    // Pick cleaner with lowest count (treat missing/reset as 0)\n    let best = null;\n    let bestCount = Infinity;\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const needsReset = j?._needsReset === true;\n      const count = needsReset ? 0 : parseInt(j?.assignmentCount ?? '0', 10) || 0;\n      const cId = get(r, 'cleanerId');\n      if (count < bestCount || (count === bestCount && cId < (best?.id ?? '\u00c3\u00af\u00c2\u00bf\u00c2\u00bf'))) {\n        bestCount = count;\n        best = { id: cId, needsReset };\n      }\n    }\n    assignedCleanerId = best.id;\n  }\n}\n\n// \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac Step 3: get cleaner details \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\nconst cleanerRow = cleaners.find(r => get(r, 'cleanerId') === assignedCleanerId);\nif (!cleanerRow) throw new Error(`No CleanersProfile row for cleanerId: ${assignedCleanerId}.`);\n\nconst email      = get(cleanerRow, 'email');\nconst calendarId = get(cleanerRow, 'calendarId', 'calendar ID');\nconst name       = get(cleanerRow, 'name');\nconst phone      = get(cleanerRow, 'phone');\n\nconst assignedAt = new Date().toISOString();\nconst out = {\n  ...item,\n  cleanerId:         assignedCleanerId,\n  cleanerEmail:      email      || item.cleanerEmail      || '',\n  cleanerCalendarId: calendarId || item.cleanerCalendarId || '',\n  cleanerName:       name       || item.cleanerName       || '',\n  assignedCleaner:   name       || item.assignedCleaner   || '',\n  cleanerContact:    phone      || item.cleanerContact    || '',\n  assignedAt,\n  status: 'ASSIGNED',\n  propertyName: propertyNameFromSheet || item.propertyName || propertyUid,\n  _isFixedAssignment: isFixed,\n  _noCleanerAvailable: false\n};\ndelete out._properties;\ndelete out._cleanersProfile;\ndelete out._allCleaningJobs;\nreturn [{ json: out }];"
+                "jsCode": "// ASSIGN CLEANER \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d fixed property OR availability-based with round-robin tiebreak\nconst DURATION_HOURS = 3;\nconst item = $input.first().json;\nconst propertyUid = (item.propertyUid ?? '').toString().trim();\n\nconst properties   = Array.isArray(item._properties)      ? item._properties      : [];\nconst cleaners     = Array.isArray(item._cleanersProfile)  ? item._cleanersProfile : [];\nconst allJobs      = Array.isArray(item._allCleaningJobs)  ? item._allCleaningJobs : [];\n\nif (properties.length === 0) throw new Error('No Properties data. Ensure Read Properties ran.');\nif (cleaners.length === 0)   throw new Error('No CleanersProfile data. Ensure Read CleanersProfile ran.');\n\nconst get = (row, ...keys) => {\n  const j = row && (row.json !== undefined ? row.json : row);\n  if (!j || typeof j !== 'object') return '';\n  for (const k of keys) {\n    const v = j[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac Step 1: find property row \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\nconst propRow = properties.find(r => get(r, 'propertyUid') === propertyUid);\nif (!propRow) throw new Error(`No Properties row for propertyUid: ${propertyUid}.`);\n\nconst propertyNameFromSheet = get(propRow, 'propertyName');\nconst fixedCleanerId        = get(propRow, 'fixedCleanerId');\n\n// \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac Step 2: resolve cleaner \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d fixed or availability \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\nlet assignedCleanerId;\nlet isFixed = false;\n\nif (fixedCleanerId) {\n  // Fixed assignment \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d bypass availability check\n  assignedCleanerId = fixedCleanerId;\n  isFixed = true;\n} else {\n  // Availability-based assignment\n  const newStart = item.scheduledCleaningTimeUTC ? new Date(item.scheduledCleaningTimeUTC) : null;\n  if (!newStart || isNaN(newStart.getTime())) throw new Error('Missing or invalid scheduledCleaningTimeUTC on job.');\n  const newEnd = new Date(newStart.getTime() + DURATION_HOURS * 3600 * 1000);\n\n  // Collect busy cleaner IDs from ASSIGNED jobs that overlap with new job window\n  const busyCleanerIds = new Set();\n  for (const jobRow of allJobs) {\n    const j = jobRow?.json ?? jobRow;\n    const jStatus    = (j?.status ?? '').toString().trim();\n    const jCleanerId = (j?.cleanerId ?? '').toString().trim();\n    const jBookingUid = (j?.bookingUid ?? '').toString().trim();\n    // Skip: not ASSIGNED, no cleaner, or this is the same job\n    if (jStatus !== 'ASSIGNED') continue;\n    if (!jCleanerId) continue;\n    if (jBookingUid === (item.bookingUid ?? '').toString().trim()) continue;\n    // Skip if missing scheduledCleaningTimeUTC \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d treat as non-blocking\n    const startStr = (j?.scheduledCleaningTimeUTC ?? '').toString().trim();\n    if (!startStr) continue;\n    const existStart = new Date(startStr);\n    if (isNaN(existStart.getTime())) continue;\n    const existEnd = new Date(existStart.getTime() + DURATION_HOURS * 3600 * 1000);\n    // Standard interval overlap: existStart < newEnd AND existEnd > newStart\n    if (existStart < newEnd && existEnd > newStart) {\n      busyCleanerIds.add(jCleanerId);\n    }\n  }\n\n  // Build set of all fixed cleaners (assigned to a specific property)\n  const allFixedCleanerIds = new Set(\n    properties.map(r => get(r, 'fixedCleanerId')).filter(id => id !== '')\n  );\n\n  // Get declined cleaners for this specific job\n  const declinedByStr = (item.declinedBy || '').toString().trim();\n  const declinedByIds = declinedByStr\n    ? declinedByStr.split(',').map(s => s.trim()).filter(Boolean)\n    : [];\n\n  // Available cleaners = non-busy AND not fixed AND not declined this job\n  const availableCleaners = cleaners.filter(r => {\n    const cId = get(r, 'cleanerId');\n    return cId && !busyCleanerIds.has(cId)\n      && !allFixedCleanerIds.has(cId)\n      && !declinedByIds.includes(cId);\n  });\n\n  if (availableCleaners.length === 0) {\n    // Signal no-cleaner-found \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d handled by downstream IF node\n    return [{ json: { ...item, _noCleanerAvailable: true, propertyName: propertyNameFromSheet || item.propertyName || propertyUid } }];\n  }\n\n  if (availableCleaners.length === 1) {\n    assignedCleanerId = get(availableCleaners[0], 'cleanerId');\n  } else {\n    // Multiple available \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d check reset then pick lowest assignmentCount\n    const now = new Date();\n    // Reset counts if any cleaner's resetDate has passed\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const resetDateStr = (j?.assignmentCountResetDateUTC ?? '').toString().trim();\n      if (resetDateStr) {\n        const resetDate = new Date(resetDateStr);\n        if (!isNaN(resetDate.getTime()) && now >= resetDate) {\n          // Mark for reset \u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\udc9d actual sheet update done in Increment node\n          if (j) j._needsReset = true;\n        }\n      }\n    }\n    // Pick cleaner with lowest count (treat missing/reset as 0)\n    let best = null;\n    let bestCount = Infinity;\n    for (const r of availableCleaners) {\n      const j = r?.json ?? r;\n      const needsReset = j?._needsReset === true;\n      const count = needsReset ? 0 : parseInt(j?.assignmentCount ?? '0', 10) || 0;\n      const cId = get(r, 'cleanerId');\n      if (count < bestCount || (count === bestCount && cId < (best?.id ?? '\u00c3\u00af\u00c2\u00bf\u00c2\u00bf'))) {\n        bestCount = count;\n        best = { id: cId, needsReset };\n      }\n    }\n    assignedCleanerId = best.id;\n  }\n}\n\n// \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac Step 3: get cleaner details \u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\u00c3\u00a2\u00e2\u20ac\udc9d\u00e2\u201a\u00ac\nconst cleanerRow = cleaners.find(r => get(r, 'cleanerId') === assignedCleanerId);\nif (!cleanerRow) throw new Error(`No CleanersProfile row for cleanerId: ${assignedCleanerId}.`);\n\nconst email      = get(cleanerRow, 'email');\nconst calendarId = get(cleanerRow, 'calendarId', 'calendar ID');\nconst name       = get(cleanerRow, 'name');\nconst phone      = get(cleanerRow, 'phone');\n\nconst assignedAt = new Date().toISOString();\nconst out = {\n  ...item,\n  cleanerId:         assignedCleanerId,\n  cleanerEmail:      email      || item.cleanerEmail      || '',\n  cleanerCalendarId: calendarId || item.cleanerCalendarId || '',\n  cleanerName:       name       || item.cleanerName       || '',\n  assignedCleaner:   name       || item.assignedCleaner   || '',\n  cleanerContact:    phone      || item.cleanerContact    || '',\n  assignedAt,\n  status: 'ASSIGNED',\n  propertyName: propertyNameFromSheet || item.propertyName || propertyUid,\n  _isFixedAssignment: isFixed,\n  _noCleanerAvailable: false\n};\ndelete out._properties;\ndelete out._cleanersProfile;\ndelete out._allCleaningJobs;\nreturn [{ json: out }];"
             },
             "id": "da1b39fb-1408-4e80-b407-d37e762be606",
             "name": "Assign Cleaner",
@@ -2058,6 +2058,203 @@
                 -240
             ]
         }
+,
+        {
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "strict",
+                            "version": 1
+                        },
+                        "conditions": [
+                            {
+                                "id": "is-fixed",
+                                "leftValue": "={{ $json._isFixedAssignment }}",
+                                "rightValue": true,
+                                "operator": {
+                                    "type": "boolean",
+                                    "operation": "equals"
+                                }
+                            }
+                        ],
+                        "combinator": "and"
+                    },
+                    "options": {}
+                },
+                "id": "wf2mod01-aaaa-4bbb-cccc-dd0000000001",
+                "name": "Is Fixed Assignment?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2,
+                "position": [
+                    -5024,
+                    -432
+                ],
+                "notes": "TRUE = fixed cleaner (auto-assign, existing flow). FALSE = round-robin (send offer email)."
+            },
+            {
+                "parameters": {
+                    "jsCode": "const WEBHOOK_BASE = 'http://localhost:5678/webhook/job-response';\nconst job = $input.first().json;\nconst bookingUid = job.bookingUid || '';\nconst cleanerId  = job.cleanerId  || '';\nconst qs = '?bookingUid=' + encodeURIComponent(bookingUid)\n         + '&cleanerId='  + encodeURIComponent(cleanerId);\nconst acceptLink  = WEBHOOK_BASE + qs + '&response=accept';\nconst declineLink = WEBHOOK_BASE + qs + '&response=decline';\nconst startTime = (job.scheduledCleaningTimeUTC || '').trim();\nlet dateStr = 'TBD', timeStr = 'TBD';\nif (startTime) {\n  const d = new Date(startTime);\n  if (!isNaN(d.getTime())) {\n    dateStr = d.toISOString().slice(0, 10);\n    timeStr = d.toISOString().slice(11, 16) + ' UTC';\n  }\n}\nreturn [{ json: {\n  ...job,\n  acceptLink,\n  declineLink,\n  offerDateStr: dateStr,\n  offerTimeStr: timeStr,\n  offeredAt: new Date().toISOString()\n} }];"
+                },
+                "id": "wf2mod02-aaaa-4bbb-cccc-dd0000000002",
+                "name": "Generate Offer Links",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    -4800,
+                    -624
+                ],
+                "notes": "Builds Accept/Decline webhook URLs and formats date/time for the offer email."
+            },
+            {
+                "parameters": {
+                    "sendTo": "={{ $json.cleanerEmail }}",
+                    "subject": "=New Cleaning Job Available - {{ $json.propertyName || $json.propertyUid }}",
+                    "emailType": "text",
+                    "message": "=Hi {{ $json.cleanerName || 'there' }},\n\nA new cleaning job is available and we would like to offer it to you.\n\nProperty: {{ $json.propertyName || $json.propertyUid }}\nDate:     {{ $json.offerDateStr }}\nTime:     {{ $json.offerTimeStr }}\n\nPlease respond within 1 hour.\n\nACCEPT JOB:\n{{ $json.acceptLink }}\n\nDECLINE:\n{{ $json.declineLink }}\n\nIf you do not respond within 1 hour, the job will be offered to another cleaner.",
+                    "options": {}
+                },
+                "id": "wf2mod03-aaaa-4bbb-cccc-dd0000000003",
+                "name": "Send Offer Email",
+                "type": "n8n-nodes-base.gmail",
+                "typeVersion": 2.1,
+                "position": [
+                    -4576,
+                    -624
+                ],
+                "webhookId": "c4d5e6f7-a8b9-4c0d-1e2f-a3b4c5d6e7f8",
+                "credentials": {
+                    "gmailOAuth2": {
+                        "id": "6sr232YN6z3c4tiW",
+                        "name": "Gmail account"
+                    }
+                },
+                "notes": "Sends the offer with Accept/Decline links. Cleaner has 1 hour to respond."
+            },
+            {
+                "parameters": {
+                    "operation": "update",
+                    "documentId": {
+                        "__rl": true,
+                        "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+                        "mode": "id"
+                    },
+                    "sheetName": {
+                        "__rl": true,
+                        "value": "2047086003",
+                        "mode": "id"
+                    },
+                    "columns": {
+                        "mappingMode": "defineBelow",
+                        "value": {
+                            "bookingUid": "={{ $json.bookingUid }}",
+                            "status": "OFFERED",
+                            "cleanerId": "={{ $json.cleanerId }}",
+                            "assignedCleaner": "={{ $json.cleanerName }}",
+                            "assignedAt": "={{ $json.offeredAt }}",
+                            "offeredTo": "={{ $json.cleanerId }}",
+                            "offeredAt": "={{ $json.offeredAt }}",
+                            "processingFlag": " "
+                        },
+                        "matchingColumns": [
+                            "bookingUid"
+                        ],
+                        "schema": [
+                            {
+                                "id": "bookingUid",
+                                "displayName": "bookingUid",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "status",
+                                "displayName": "status",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "cleanerId",
+                                "displayName": "cleanerId",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "assignedCleaner",
+                                "displayName": "assignedCleaner",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "assignedAt",
+                                "displayName": "assignedAt",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "offeredTo",
+                                "displayName": "offeredTo",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "offeredAt",
+                                "displayName": "offeredAt",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            },
+                            {
+                                "id": "processingFlag",
+                                "displayName": "processingFlag",
+                                "type": "string",
+                                "required": false,
+                                "defaultMatch": false,
+                                "display": true,
+                                "canBeUsedToMatch": true
+                            }
+                        ],
+                        "attemptToConvertTypes": false,
+                        "convertFieldsToString": false
+                    },
+                    "options": {}
+                },
+                "id": "wf2mod04-aaaa-4bbb-cccc-dd0000000004",
+                "name": "Update Job Offered",
+                "type": "n8n-nodes-base.googleSheets",
+                "typeVersion": 4.4,
+                "position": [
+                    -4352,
+                    -624
+                ],
+                "credentials": {
+                    "googleSheetsOAuth2Api": {
+                        "id": "q52dbWoN6OaKRDZO",
+                        "name": "Google Sheets account"
+                    }
+                },
+                "notes": "Sets status=OFFERED, records offeredTo and offeredAt. Clears processingFlag."
+            }
     ],
     "connections": {
         "Single Item for Read Jobs": {
@@ -2365,7 +2562,7 @@
                 ],
                 [
                     {
-                        "node": "Increment Assignment Count",
+                        "node": "Is Fixed Assignment?",
                         "type": "main",
                         "index": 0
                     }
@@ -2427,6 +2624,58 @@
                 ]
             ]
         }
+,
+        "Is Fixed Assignment?": {
+                "main": [
+                    [
+                        {
+                            "node": "Increment Assignment Count",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Generate Offer Links",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Generate Offer Links": {
+                "main": [
+                    [
+                        {
+                            "node": "Send Offer Email",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Send Offer Email": {
+                "main": [
+                    [
+                        {
+                            "node": "Update Job Offered",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Update Job Offered": {
+                "main": [
+                    [
+                        {
+                            "node": "Split In Batches",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
     },
     "settings": {
         "executionOrder": "v1",
