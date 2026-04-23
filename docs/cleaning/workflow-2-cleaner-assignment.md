@@ -95,3 +95,28 @@ Picks up PENDING cleaning jobs created by Workflow 1 and assigns a cleaner, crea
 | Clock-out link in email + calendar | Email contains both Step 1 (clock-in) and Step 2 (clock-out) links. Calendar description contains both. CleaningJobs row has `clockOutLink` populated | ⏳ Needs retest |
 | Fixed cleaner not spilling into other properties | Cleaner fixed to Eagle's Nest should NOT be assigned to 120 Opry House via round-robin | ✅ Pass (exec #3755) |
 | Fixed cleaner assigned to their own property | Eagle's Nest job → Nouman assigned, `_isFixedAssignment=True` | ✅ Pass (exec #3756) |
+
+---
+
+## Deferred: Dual-Trigger Webhook Entry
+
+**Status:** TODO, not scheduled.
+**Tracked in:** `docs/cleaning/optimization-plan.md` → Deferred Items → item 1.
+
+### What
+
+Add a second trigger to this workflow — a Webhook node — so Workflow 1 (Hostfully ingest) can POST to it immediately after inserting a new CleaningJobs row. This reduces assignment latency from "up to 1 minute" (waiting for the next schedule tick) to "a few seconds".
+
+### Why it is deferred
+
+- The current 1-minute schedule is already acceptable for operations.
+- The schedule trigger is the source of the `processingFlag` row-level lock. A second entry point must not break that invariant.
+- Adding dual-trigger without re-examining race conditions could cause double-assignment (webhook and schedule fire within the same second on the same PENDING row).
+
+### What to do when picking this up
+
+1. Keep the schedule trigger as-is (it's the safety net and race-lock coordinator).
+2. Add a Webhook trigger `POST /webhook/cleaner-assignment` that accepts `{ bookingUid }` as payload.
+3. Webhook path starts at "Find Unassigned Jobs" but filters to the single `bookingUid` from the payload.
+4. Ensure `processingFlag` is set before any Google Sheets read of that row, and the flag check still excludes webhook-path rows the schedule might race on.
+5. Test: schedule tick and webhook call firing within 500ms of each other on the same bookingUid → exactly one assignment.
