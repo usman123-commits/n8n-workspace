@@ -4,7 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "clockin-v2",
+        "path": "clockin",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -16,7 +16,7 @@
         -208,
         208
       ],
-      "webhookId": "af97aeb6-9a57-44ab-9496-c35f3d10c390"
+      "webhookId": "49fde8af-2417-4b10-985c-e504c86af9b7"
     },
     {
       "parameters": {

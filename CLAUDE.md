@@ -212,19 +212,27 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 
 ## Workflows & Their IDs
 
-| ID | Workflow Name | Trigger Type |
-|----|--------------|--------------|
-| `AU1w579a167hGom7` | PHASE 2 – Cleaner Assignment + Calendar Dispatch | — |
-| `B7duBLBoOCdLpztS` | Workflow 3B – ClockIn Validation Processor | — |
-| `BQ6uHsWxBcegrfrv` | cancellationHandler | — |
-| `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync | — |
-| `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | — |
-| `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | — |
-| `qIV56v4P8klISyR2` | Workflow 3W – Clock-In Ingestion (Webhook) | Webhook POST `/webhook/clockin` |
-| `VTlIwLr3cK896sLO` | Workflow 4 – Checkout Ingestion | Google Sheets Trigger (RawCheckoutResponses) |
-| `ptUTUMasJXbVzm2Q` | Workflow 4W – Checkout Ingestion (Webhook) | Webhook POST `/webhook/checkout` |
-| `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) |
-| `7X0QKeFueWTdz0GW` | Workflow 5 – Payroll Processing | Schedule (daily 02:00 UTC) |
+| ID | Workflow Name | Trigger | Status |
+|----|--------------|---------|--------|
+| `AU1w579al67hGom7` | PHASE 2 – Cleaner Assignment + Calendar Dispatch | Schedule (every 1 min) | Active |
+| `IZIywHWhoK32cp7Z` | Workflow 2B – Job Response Handler | Webhook POST `/webhook/job-response` | Live |
+| `DQbsPmZGHAI4JVDl` | Workflow 2C – Offer Timeout Checker | Schedule | Live |
+| `EbYPXFGOuXeDH5Cw` | Workflow 3W – Clock-In Ingestion + Validation (Merged) | Webhook POST `/webhook/clockin` | **Active (Phase 1 merged)** |
+| `ptUTUMasJXbVzm2Q` | Workflow 4W – Checkout Ingestion (Webhook) | Webhook POST `/webhook/checkout` | Active |
+| `um2uq299261x1xyV` | Workflow 4B – Checkout Validation Processor | Schedule (every 1 min) | Active (Phase 1 target: merge into 4W) |
+| `7X0QKeFueWTdz0GW` | Workflow 5 – Payroll Processing | Schedule (daily 02:00 UTC) | Active |
+| `BQ6uHsWxBcegrfrv` | cancellationHandler | Webhook POST `/webhook/cancellation-handler` | Active |
+| `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | Webhook POST `/webhook/extended-checkout-handler` | Active |
+| `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync | Schedule (every 1 min) | Active (Phase 2 target: replace with webhook) |
+
+### Deactivated / Rollback Only (do not reactivate)
+
+| ID | Workflow Name | Replaced By |
+|----|--------------|-------------|
+| `qIV56v4P8klISyR2` | Workflow 3W – Clock-In Ingestion (old) | `EbYPXFGOuXeDH5Cw` — delete after 7-day observation |
+| `B7duBLBoOCdLpztS` | Workflow 3B – ClockIn Validation Processor | `EbYPXFGOuXeDH5Cw` — delete after 7-day observation |
+| `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | Fully retired — safe to delete |
+| `VTlIwLr3cK896sLO` | Workflow 4 – Checkout Ingestion (Google Sheets trigger) | Fully retired — safe to delete |
 
 ---
 
