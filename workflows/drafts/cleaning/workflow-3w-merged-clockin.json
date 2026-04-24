@@ -147,9 +147,7 @@
         "sheetName": {
           "__rl": true,
           "value": 1402437116,
-          "mode": "list",
-          "cachedResultName": "ClockInSubmissions",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit#gid=1402437116"
+          "mode": "id"
         },
         "filtersUI": {
           "values": [
@@ -502,14 +500,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "CleaningJobs",
-          "mode": "name"
+          "value": 2047086003,
+          "mode": "id"
         },
         "filtersUI": {
           "values": [
@@ -540,7 +536,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Single-item flow (was multi-item in 3B).\n// Submission data comes from the inserted row; job data is in $input (from Edit Fields).\nconst submission = $('Insert Structured Row').first().json;\nconst job = $input.first().json;\nreturn [{ json: { ...submission, ...job } }];\n"
+        "jsCode": "// Single-item flow: lookup returned the freshly inserted row (includes row_number).\n// Job data is in $input (from Edit Fields, row_number stripped).\nconst submission = $('Lookup Inserted Row').first().json;\nconst job = $input.first().json;\nreturn [{ json: { ...submission, ...job } }];\n"
       },
       "id": "c631c27f-a9ef-4248-8e1e-3ee9b7f5a424",
       "name": "Merge Submission and Job",
@@ -594,14 +590,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "ClockInSubmissions",
-          "mode": "name"
+          "value": 1402437116,
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -620,7 +614,7 @@
               "id": "bookingUid",
               "displayName": "bookingUid",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
@@ -659,7 +653,7 @@
               "id": "submissionTimestamp",
               "displayName": "submissionTimestamp",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true,
@@ -696,12 +690,11 @@
               "id": "row_number",
               "displayName": "row_number",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "number",
               "canBeUsedToMatch": true,
-              "readOnly": true,
-              "removed": false
+              "readOnly": true
             }
           ],
           "attemptToConvertTypes": false,
@@ -761,14 +754,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "Properties",
-          "mode": "name"
+          "value": 766791868,
+          "mode": "id"
         },
         "filtersUI": {
           "values": [
@@ -853,14 +844,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "ClockInSubmissions",
-          "mode": "name"
+          "value": 1402437116,
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -868,8 +857,8 @@
             "processingStatus": "APPROVED",
             "resultMessage": "Clock-in successful",
             "processedAt": "={{ $now.toISO() }}",
-            "row_number": "={{ $json.row_number }}",
-            "bookingUid": "={{ $json.bookingUid }}"
+            "bookingUid": "={{ $json.bookingUid }}",
+            "row_number": "={{ $json.row_number }}"
           },
           "matchingColumns": [
             "row_number"
@@ -879,7 +868,7 @@
               "id": "bookingUid",
               "displayName": "bookingUid",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
@@ -918,7 +907,7 @@
               "id": "submissionTimestamp",
               "displayName": "submissionTimestamp",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true,
@@ -955,12 +944,11 @@
               "id": "row_number",
               "displayName": "row_number",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "number",
               "canBeUsedToMatch": true,
-              "readOnly": true,
-              "removed": false
+              "readOnly": true
             }
           ],
           "attemptToConvertTypes": false,
@@ -991,14 +979,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "CleaningJobs",
-          "mode": "name"
+          "value": 2047086003,
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -1299,14 +1285,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
-          "value": "ClockInSubmissions",
-          "mode": "name"
+          "value": 1402437116,
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -1314,6 +1298,7 @@
             "processingStatus": "REJECTED",
             "resultMessage": "Cleaner outside allowed 100m radius",
             "processedAt": "={{ $now.toISO() }}",
+            "bookingUid": "={{ $json.bookingUid }}",
             "row_number": "={{ $json.row_number }}"
           },
           "matchingColumns": [
@@ -1324,7 +1309,7 @@
               "id": "bookingUid",
               "displayName": "bookingUid",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true
@@ -1363,7 +1348,7 @@
               "id": "submissionTimestamp",
               "displayName": "submissionTimestamp",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true,
@@ -1400,12 +1385,11 @@
               "id": "row_number",
               "displayName": "row_number",
               "required": false,
-              "defaultMatch": false,
+              "defaultMatch": true,
               "display": true,
               "type": "number",
               "canBeUsedToMatch": true,
-              "readOnly": true,
-              "removed": false
+              "readOnly": true
             }
           ],
           "attemptToConvertTypes": false,
@@ -1513,16 +1497,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": 1920390373,
-          "mode": "list",
-          "cachedResultName": "CleanersProfile",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit#gid=1920390373"
+          "mode": "id"
         },
         "filtersUI": {
           "values": [
@@ -1593,16 +1573,12 @@
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-          "mode": "list",
-          "cachedResultName": "Hostfully Operations V2",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit?usp=drivesdk"
+          "mode": "id"
         },
         "sheetName": {
           "__rl": true,
           "value": 569949670,
-          "mode": "list",
-          "cachedResultName": "Reservations",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw/edit#gid=569949670"
+          "mode": "id"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -2102,6 +2078,48 @@
         3960,
         968
       ]
+    },
+    {
+      "id": "5899d49c-4d6a-47bc-8f41-da96e7ef5259",
+      "name": "Lookup Inserted Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2448,
+        484
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1402437116,
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "submissionTimestamp",
+              "lookupValue": "={{ $json.submissionTimestamp }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
     }
   ],
   "connections": {
@@ -2294,7 +2312,7 @@
             "index": 0
           },
           {
-            "node": "Get Booking",
+            "node": "Lookup Inserted Row",
             "type": "main",
             "index": 0
           }
@@ -2486,6 +2504,17 @@
         [
           {
             "node": "Send Aprooved Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Inserted Row": {
+      "main": [
+        [
+          {
+            "node": "Get Booking",
             "type": "main",
             "index": 0
           }
