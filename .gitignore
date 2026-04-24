@@ -12,3 +12,7 @@ tokens.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Scratch dirs
+.tmp/
+workflows/drafts/cleaning/_fetch-*.json
