@@ -1,6 +1,6 @@
 # Cold Email System — Overview
 
-**Status:** Pre-Build
+**Status:** CE-1 built & tested ✅ | CE-2 through CE-5 not yet built
 **Date:** March 30, 2026
 **Project:** Zelvop — Field Operations Systems
 
@@ -18,23 +18,42 @@ sequence sending, reply handling, and weekly reporting.
 
 ## The 5 Workflows
 
-| # | Workflow | Trigger | Purpose |
-|---|---------|---------|---------|
-| CE-1 | Lead Qualification Engine | Google Sheets (new row) | Score leads against ICP using Apify + Claude |
-| CE-2 | Email Generation + Approval | Schedule (8am daily) | AI-generate personalized emails, approve via Telegram |
-| CE-3 | Sequence Execution Engine | Schedule (10am + 2pm daily) | Send emails on schedule with reply detection |
-| CE-4 | Reply Handler | Gmail poll (every 30 min) | Categorize replies, notify via Telegram |
-| CE-5 | Weekly Report | Schedule (Sunday 7pm) | Performance summary to Telegram |
+| # | Workflow ID | Workflow | Trigger | Status |
+|---|------------|---------|---------|--------|
+| CE-1 | `4TaA4kHwa5r1GULP` | Lead Qualification Engine | Google Sheets (row added) | Built & tested ✅ |
+| CE-2 | — | Email Generation + Approval | Schedule (8am daily) | Not built |
+| CE-3 | — | Sequence Execution Engine | Schedule (10am + 2pm daily) | Not built |
+| CE-4 | — | Reply Handler | Gmail poll (every 30 min) | Not built |
+| CE-5 | — | Weekly Report | Schedule (Sunday 7pm) | Not built |
+
+---
+
+## Google Sheet
+
+**Spreadsheet:** Cold Email Outreach — Zelvop
+**ID:** `1XZFkpgFbidxelGcZZ6_C3YjwktAJOqFbZ9h-AlndcXU`
+
+| Tab | Sheet ID (gid) | Purpose |
+|-----|----------------|---------|
+| Raw Leads | `0` | New leads you add during research |
+| Approved Leads | `1866609254` | Scored >= 7, ready for email generation |
+| Review Queue | `989136210` | Scored < 7, manual review needed |
+| Suppression List | — (not yet created) | Unsubscribed emails — never contact again |
+| Email Templates | — (not yet created) | Template references for Claude prompt |
+| Campaign Log | — (not yet created) | Every email sent (for reporting) |
 
 ---
 
 ## Data Flow
 
 ```
-You add lead to Google Sheet
+You add lead to Raw Leads tab
         |
         v
-[CE-1] Score & qualify lead (Apify + Claude)
+[CE-1] Filter (skip if ICP Score already filled)
+        |
+        v
+[CE-1] Apify scrapes Google Maps → Jina fetches website → Claude scores lead
         |
     Score >= 7? ──No──> Review Queue (manual override)
         |
@@ -67,21 +86,6 @@ You add lead to Google Sheet
 
 ---
 
-## Google Sheet Structure
-
-**Spreadsheet:** To be created
-
-| Tab | Purpose |
-|-----|---------|
-| Raw Leads | New leads you add during research |
-| Approved Leads | Scored >= 7, ready for email generation |
-| Review Queue | Scored < 7, manual review needed |
-| Suppression List | Unsubscribed emails — never contact again |
-| Email Templates | Template references for Claude prompt |
-| Campaign Log | Every email sent (for reporting) |
-
----
-
 ## Tool Stack
 
 | Tool | Role | Cost |
@@ -89,13 +93,14 @@ You add lead to Google Sheet
 | n8n (self-hosted) | All workflow automation | $0 (localhost) |
 | Google Sheets | Lead database + tracking | $0 |
 | Gmail / Hostinger SMTP | Email sending (outreach@zelvophq.com) | $0-$1/mo |
-| Claude API | ICP scoring + email generation + reply categorization | ~$5-15/mo |
-| Apify | Google Maps scraping | $5/mo starter |
+| Claude API (haiku-4-5) | ICP scoring + reply categorization | ~$0.001/call |
+| Claude API (sonnet-4-6) | Email generation | ~$0.01/call |
+| Apify | Google Maps scraping (actor: nwua9Gu5YrADL7ZDj) | $5/mo starter |
 | Jina.ai | Website content extraction | Free tier |
 | Telegram Bot | Approval workflow + notifications + reports | $0 |
 | Gmail Postmaster Tools | Deliverability monitoring | $0 |
 
-**Total:** ~$10-30/month
+**Total:** ~$10-21/month at 20 emails/day, 150 leads
 
 ---
 
@@ -114,9 +119,9 @@ You add lead to Google Sheet
 
 | Week | Build | Why This Order |
 |------|-------|----------------|
-| 1 | CE-3 (Sending) + CE-1 (Scoring) | Sending gives immediate value; scoring removes manual work |
-| 2 | CE-2 (Generation) + CE-4 (Reply Handler) | Quality layer + reply management |
-| 3 | CE-5 (Reporting) + prompt refinement | Reporting + optimize based on first 2 weeks |
+| 1 | CE-1 (Scoring) ✅ | Removes manual qualification work immediately |
+| 2 | CE-2 (Generation) + CE-3 (Sending) | Core outreach loop |
+| 3 | CE-4 (Reply Handler) + CE-5 (Reporting) | Close the loop on replies and metrics |
 
 ---
 
@@ -129,13 +134,3 @@ Add Instantly.ai when ALL of these are true:
 - Lead list exceeds 500
 
 Until then, n8n is the better choice.
-
----
-
-## Open Questions (Must Resolve Before Building)
-
-1. **Follow-up emails (2, 3, 4):** AI-generated per lead or static templates?
-2. **Email sending account:** Gmail free vs Google Workspace vs Hostinger SMTP?
-3. **Volume balancing:** 25 Email 1s/day generated vs 20 total sends/day — queue overflow?
-4. **Telegram approval architecture:** Needs webhook trigger for button callbacks
-5. **Suppression list check:** CE-3 must check suppression list before every send

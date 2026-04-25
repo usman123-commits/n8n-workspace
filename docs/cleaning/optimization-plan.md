@@ -188,7 +188,7 @@ Headers:
   "agencyUid": "<your agency UID>",
   "eventType": "NEW_BOOKING",
   "webHookType": "POST_JSON",
-  "callbackUrl": "https://<your-n8n-cloud-host>/webhook/hostfully-booking-event"
+  "callbackUrl": "https://n8n.srv1566844.hstgr.cloud/webhook/hostfully-booking-event"
 }
 ```
 
@@ -198,7 +198,7 @@ Headers:
   "agencyUid": "<your agency UID>",
   "eventType": "BOOKING_UPDATED",
   "webHookType": "POST_JSON",
-  "callbackUrl": "https://<your-n8n-cloud-host>/webhook/hostfully-booking-event"
+  "callbackUrl": "https://n8n.srv1566844.hstgr.cloud/webhook/hostfully-booking-event"
 }
 ```
 
@@ -215,6 +215,24 @@ Should list both.
 ```
 DELETE https://api.hostfully.com/api/v3/webhooks/<webhookUid>
 ```
+
+________________________
+this is the webhook payload for BookingUpdatedHook
+{
+  "agency_uid":"1293fab6-71ba-4317-a3c0-be3365180c7b",
+  "event_type":"BOOKING_UPDATED",
+  "lead_uid":"ce0668b5-7abd-4928-8dba-113d687dac58",
+  "property_uid":"906738ca-aacb-4e86-be5f-9e7616507c12"
+}
+so when we recive a webhook we have to call the api again we dont reveive the full payload
+1-we have to filter by agency_uid to confirm we are receiving lead for our agency 
+2-we have to map thorugh event_type 
+3- then we have to call api through lead_uid
+
+
+
+
+__________________________
 
 ### New Workflow 1 shape (webhook-driven)
 

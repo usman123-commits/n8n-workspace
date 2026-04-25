@@ -1,0 +1,682 @@
+{
+  "name": "WhatsApp AI Auto-Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup Required\n**1.** Create n8n credential:\n- Type: **HTTP Header Auth**\n- Name: `Gemini API`\n- Header Name: `x-goog-api-key`\n- Header Value: your Gemini API key\n\n**2.** Set env variable (optional):\n- `BAILEYS_BRIDGE_URL` = http://localhost:3000\n\n**3.** Google Sheet (already created):\n**WhatsApp AI Conversations**\nID: `1aso9dDUUdYSCCO_dPRBYuukhjL2CK0nBB0WiYDsZXkQ`",
+        "height": 200,
+        "width": 420,
+        "color": 5
+      },
+      "id": "sticky-001",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Baileys Bridge URL\nUpdate the **Send Reply via Baileys** node URL:\n- Local: `http://localhost:3000/send`\n- Remote: `http://YOUR_SERVER_IP:3000/send`\n\nThe Baileys app must be running before this workflow triggers.",
+        "width": 320,
+        "color": 3
+      },
+      "id": "sticky-002",
+      "name": "Baileys Bridge Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        672,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error Handling\n- Gemini API failure ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ execution stops silently, no reply sent\n- Google Sheets failure ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ reply still sends, logging skipped\n- Group/status messages ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ filtered out at IF node",
+        "height": 140,
+        "width": 300,
+        "color": 4
+      },
+      "id": "sticky-003",
+      "name": "Error Handling Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-incoming",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-001",
+      "name": "WhatsApp Incoming",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        304
+      ],
+      "webhookId": "whatsapp-incoming-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "ok",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "resp-001",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        224,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.body.message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.body.from }}",
+              "rightValue": "@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "c3",
+              "leftValue": "={{ $json.body.from }}",
+              "rightValue": "status",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "d37326c5-38cc-4940-b37d-b396a82f129a",
+              "leftValue": "={{ $json.body.fromName }}",
+              "rightValue": "Hifza Rehab",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-001",
+      "name": "Filter Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "v1",
+              "name": "contact_jid",
+              "value": "={{ $json.body.from }}",
+              "type": "string"
+            },
+            {
+              "id": "v2",
+              "name": "contact_name",
+              "value": "={{ $json.body.fromName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "v3",
+              "name": "incoming_message",
+              "value": "={{ $json.body.message }}",
+              "type": "string"
+            },
+            {
+              "id": "v4",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp || new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "v5",
+              "name": "sheet_date",
+              "value": "={{ new Date().toISOString().slice(0,10) }}",
+              "type": "string"
+            },
+            {
+              "id": "v6",
+              "name": "phone_number",
+              "value": "={{ $json.body.from.replace(/@.*$/, '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-001",
+      "name": "Prepare Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aso9dDUUdYSCCO_dPRBYuukhjL2CK0nBB0WiYDsZXkQ",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "0",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "contact_jid",
+              "lookupValue": "={{ $('Prepare Variables').item.json.contact_jid }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "gs-001",
+      "name": "Fetch Message History",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        880,
+        304
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format history for Gemini API (contents array)\nconst allItems = $input.all();\nconst vars = $('Prepare Variables').item.json;\n\nlet contents = [];\n\nfor (const item of allItems) {\n  const row = item.json;\n  if (!row.message_text || !row.direction) continue;\n  // Gemini uses 'model' instead of 'assistant'\n  contents.push({\n    role: row.direction === 'outgoing' ? 'model' : 'user',\n    parts: [{ text: String(row.message_text) }]\n  });\n}\n\n// Keep last 9 to leave room for current message\ncontents = contents.slice(-9);\n\n// Append current incoming message\ncontents.push({\n  role: 'user',\n  parts: [{ text: vars.incoming_message }]\n});\n\nreturn [{ json: { contents } }];"
+      },
+      "id": "code-001",
+      "name": "Format History for Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  systemInstruction: {\n    parts: [{\n      text: 'You are Zara, a real girl replying on WhatsApp. Be flirty, playful and warm — like a real girl texting her friend or crush. Use lowercase, casual spellings, and natural texting style (haha, omg, aww etc). Never use bullet points or formal formatting. Never reveal you are an AI — you are Zara, a real person.\\n\\nMatch the language — if they write in Urdu reply in Urdu, if English reply in English. If they mix both (Roman Urdu), match that too. Keep replies short, max 2–3 sentences. Add a flirty or playful touch to most replies 😉\\n\\nIf someone asks what you are doing or where you are, make something up naturally like a real person.\\n\\nIf someone asks for a picture, avoid it playfully or change the topic. Never directly refuse — dodge it naturally.\\n\\nIf someone asks for your location, avoid answering the first time. If they insist, give a vague answer like “i’m in pakistan, near islamabad” — never give exact addresses unless the conversation feels very natural and comfortable.\\n\\nDo not reveal personal details like father or mother names early. If the conversation becomes deep and natural, you can respond casually but briefly without over-explaining.\\n\\nDo not always answer directly — sometimes tease, dodge, or respond with a question. Keep a natural human flow. Show emotion, curiosity, and a bit of mystery in replies.'\n    }]\n  },\n  contents: $json.contents,\n  generationConfig: {\n    maxOutputTokens: 150,\n    temperature: 1.2\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "http-001",
+      "name": "Call Gemini Flash",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1328,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "g6McNhbsT6z9rsF9",
+          "name": "shayan gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulate human typing delay (3-7 seconds) + extract reply\nconst delay = Math.floor(Math.random() * 4000) + 3000;\nawait new Promise(resolve => setTimeout(resolve, delay));\n\nconst items = $input.all();\nreturn items.map(item => ({\n  json: {\n    ai_reply: item.json?.candidates?.[0]?.content?.parts?.[0]?.text || \"\"\n  }\n}));"
+      },
+      "id": "code-002",
+      "name": "Human Typing Delay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "set-002",
+      "name": "Prepare Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        1760,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:3000/send",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $('Prepare Variables').item.json.contact_jid, message: $('Human Typing Delay').item.json.ai_reply }) }}",
+        "options": {}
+      },
+      "id": "http-002",
+      "name": "Send Reply via Baileys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1984,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1aso9dDUUdYSCCO_dPRBYuukhjL2CK0nBB0WiYDsZXkQ",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "0",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $('Prepare Variables').item.json.timestamp }}",
+            "contact_jid": "={{ $('Prepare Variables').item.json.contact_jid }}",
+            "contact_name": "={{ $('Prepare Variables').item.json.contact_name }}",
+            "direction": "incoming",
+            "message_text": "={{ $('Prepare Variables').item.json.incoming_message }}",
+            "session_date": "={{ $('Prepare Variables').item.json.sheet_date }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_jid",
+              "displayName": "contact_jid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_text",
+              "displayName": "message_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_date",
+              "displayName": "session_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "gs-002",
+      "name": "Log Incoming Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        2208,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1aso9dDUUdYSCCO_dPRBYuukhjL2CK0nBB0WiYDsZXkQ",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "0",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ new Date().toISOString() }}",
+            "contact_jid": "={{ $('Prepare Variables').item.json.contact_jid }}",
+            "contact_name": "={{ $('Prepare Variables').item.json.contact_name }}",
+            "direction": "outgoing",
+            "message_text": "={{ $('Human Typing Delay').item.json.ai_reply }}",
+            "session_date": "={{ $('Prepare Variables').item.json.sheet_date }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_jid",
+              "displayName": "contact_jid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_text",
+              "displayName": "message_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "session_date",
+              "displayName": "session_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "gs-003",
+      "name": "Log Outgoing Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        2432,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Incoming": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Filter Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Variables",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Prepare Variables": {
+      "main": [
+        [
+          {
+            "node": "Fetch Message History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Message History": {
+      "main": [
+        [
+          {
+            "node": "Format History for Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format History for Gemini": {
+      "main": [
+        [
+          {
+            "node": "Call Gemini Flash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Gemini Flash": {
+      "main": [
+        [
+          {
+            "node": "Human Typing Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Typing Delay": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via Baileys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reply via Baileys": {
+      "main": [
+        [
+          {
+            "node": "Log Incoming Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Incoming Message": {
+      "main": [
+        [
+          {
+            "node": "Log Outgoing Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "eb8d01d1-9127-45c7-9cb8-c40ba4015b5b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "id": "dj7Drw7mdoJfk7B4",
+  "tags": []
+}

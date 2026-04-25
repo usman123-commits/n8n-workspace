@@ -3,7 +3,7 @@
     "nodes": [
         {
             "parameters": {
-                "content": "## Workflow 5 – Payroll Processing\n\n**Trigger:** Daily at 02:00 UTC (change cron to `0 2 * * 0` for weekly on Sundays)\n\n**What it does:**\n1. Reads CleanersProfile, Properties, CleaningJobs, PayrollRecords\n2. Filters to COMPLETED jobs with no payroll yet\n3. Per job: calculates hours, validates cleaner rate, checks for duplicates\n4. Writes PayrollRecord, updates CleaningJob + Reservation to READY\n5. Sends one admin summary email after all jobs are processed\n\n**ONE-TIME SETUP (before first run):**\n- Add `payrollStatus` header to CleaningJobs tab as column AF (col 32)\n- Add `hourlyRate` values in CleanersProfile tab col H for each cleaner\n- Replace `admin@example.com` in the Send Summary Email node\n\n**Design rules:**\n- Only processes COMPLETED jobs (status check is strict)\n- Snapshots hourlyRate at calculation time\n- Duplicate protection via PayrollRecords bookingUid check\n- Errors logged to PayrollErrors tab — do NOT stop the batch\n- No payments: records READY/UNPAID only",
+                "content": "## Workflow 5 – Payroll Processing\n\n**Trigger:** Daily at 02:00 UTC\n\n**What it does:**\nReads completed cleaning jobs from CleaningJobs tab, calculates worked hours from clock times, looks up cleaner hourly rates, writes payroll records to PayrollRecords tab with status READY/UNPAID, updates CleaningJobs with worked hours + payrollStatus=READY, sends admin summary email.\n\n**Errors & Edge Cases Handled:**\n1. **Sanity checks** — invalid/missing clock times, negative duration, zero duration, >12 hours\n2. **Cleaner not found** — cleanerId missing from CleanersProfile\n3. **Missing hourly rate** — hourlyRate empty or zero for cleaner\n4. **Property not found** — propertyUid lookup fails (non-fatal, falls back to UUID)\n5. **Already processed** — payrollStatus filter prevents reprocessing (jobs must be COMPLETED + payrollStatus empty/NOT_STARTED)\n\n**Error Behavior:** Errors logged to PayrollErrors tab, job marked payrollStatus=ERROR, batch continues (no job stops the workflow). Admin summary email lists all successes + failures.",
                 "height": 440,
                 "width": 640,
                 "color": 5
@@ -157,60 +157,17 @@
         },
         {
             "parameters": {
-                "jsCode": "return [{ json: {} }];"
-            },
-            "id": "aa000008-0000-0000-0000-000000000008",
-            "name": "Pass Single Item 3",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                1680,
-                0
-            ]
-        },
-        {
-            "parameters": {
-                "documentId": {
-                    "__rl": true,
-                    "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
-                    "mode": "id"
-                },
-                "sheetName": {
-                    "__rl": true,
-                    "value": "166953005",
-                    "mode": "id"
-                },
-                "options": {}
-            },
-            "id": "aa000009-0000-0000-0000-000000000009",
-            "name": "Read All PayrollRecords",
-            "type": "n8n-nodes-base.googleSheets",
-            "typeVersion": 4.4,
-            "position": [
-                1960,
-                0
-            ],
-            "credentials": {
-                "googleSheetsOAuth2Api": {
-                    "id": "q52dbWoN6OaKRDZO",
-                    "name": "Google Sheets account"
-                }
-            },
-            "notes": "Snapshot of existing payroll records loaded once at startup. Used by Check Duplicate inside the loop."
-        },
-        {
-            "parameters": {
-                "jsCode": "// Filter CleaningJobs to only rows eligible for payroll.\n// Eligible: status=COMPLETED, payrollStatus empty or NOT_STARTED, both clock times present.\nconst allJobs = $('Read CleaningJobs').all();\n\nconst eligible = allJobs.filter(item => {\n  const j = item.json || {};\n  const status        = (j.status        || '').toString().trim();\n  const payrollStatus = (j.payrollStatus || '').toString().trim();\n  const clockIn       = (j.clockInTimeUTC  || '').toString().trim();\n  const clockOut      = (j.clockOutTimeUTC || '').toString().trim();\n  return (\n    status === 'COMPLETED' &&\n    (payrollStatus === '' || payrollStatus === 'NOT_STARTED') &&\n    clockIn  !== '' &&\n    clockOut !== ''\n  );\n});\n\nreturn eligible;"
+                "jsCode": "// Filter CleaningJobs to only rows eligible for payroll.\n// Eligible: status=COMPLETED, payrollStatus empty or NOT_STARTED, both clock times present.\nconst allJobs = $input.all();\n\nconst eligible = allJobs.filter(item => {\n  const j = item.json || {};\n  const status        = (j.status        || '').toString().trim();\n  const payrollStatus = (j.payrollStatus || '').toString().trim();\n  const clockIn       = (j.clockInTimeUTC  || '').toString().trim();\n  const clockOut      = (j.clockOutTimeUTC || '').toString().trim();\n  return (\n    status === 'COMPLETED' &&\n    (payrollStatus === '' || payrollStatus === 'NOT_STARTED') &&\n    clockIn  !== '' &&\n    clockOut !== ''\n  );\n});\n\nreturn eligible;"
             },
             "id": "aa000010-0000-0000-0000-000000000010",
             "name": "Filter Eligible Jobs",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                2240,
+                1680,
                 0
             ],
-            "notes": "Returns eligible jobs by reading $('Read CleaningJobs').all() — not $input — so the Pass Single Item chain does not affect availability."
+            "notes": "Filters $input to COMPLETED jobs with empty/NOT_STARTED payrollStatus. payrollStatus filter prevents reprocessing."
         },
         {
             "parameters": {
@@ -615,66 +572,6 @@
         },
         {
             "parameters": {
-                "jsCode": "// Uses snapshot loaded at startup — avoids hitting Sheets API on every iteration.\n// If workflow ran earlier today, new records from that run are NOT in the snapshot,\n// so they will be caught by the payrollStatus=READY filter in Filter Eligible Jobs.\nconst job = $input.first().json;\nconst existingRecords = $('Read All PayrollRecords').all();\nconst isDuplicate = existingRecords.some(r => {\n  const rec = r.json || r;\n  const uid = (rec.bookingUid || '').toString().trim();\n  const pid = (rec.payrollId  || '').toString().trim();\n  return uid === (job.bookingUid || '').toString().trim() && pid !== '';\n});\nreturn [{ json: { ...job, _isDuplicate: isDuplicate } }];"
-            },
-            "id": "aa000026-0000-0000-0000-000000000026",
-            "name": "Check Duplicate",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                5040,
-                -680
-            ],
-            "notes": "Checks snapshot of PayrollRecords loaded at startup. Prevents double-write if workflow reruns within the same day."
-        },
-        {
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 1
-                    },
-                    "conditions": [
-                        {
-                            "id": "c-dup",
-                            "leftValue": "={{ $json._isDuplicate }}",
-                            "rightValue": true,
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "equals"
-                            }
-                        }
-                    ],
-                    "combinator": "and"
-                },
-                "options": {}
-            },
-            "id": "aa000027-0000-0000-0000-000000000027",
-            "name": "IF: Duplicate?",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2,
-            "position": [
-                5320,
-                -680
-            ],
-            "notes": "True -> skip (already processed). False -> write PayrollRecord."
-        },
-        {
-            "parameters": {},
-            "id": "aa000028-0000-0000-0000-000000000028",
-            "name": "Skip: Already Processed",
-            "type": "n8n-nodes-base.noOp",
-            "typeVersion": 1,
-            "position": [
-                5600,
-                -340
-            ],
-            "notes": "No-op. Loops back to SiB for the next job."
-        },
-        {
-            "parameters": {
                 "operation": "append",
                 "documentId": {
                     "__rl": true,
@@ -970,28 +867,6 @@
             "main": [
                 [
                     {
-                        "node": "Pass Single Item 3",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Pass Single Item 3": {
-            "main": [
-                [
-                    {
-                        "node": "Read All PayrollRecords",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Read All PayrollRecords": {
-            "main": [
-                [
-                    {
                         "node": "Filter Eligible Jobs",
                         "type": "main",
                         "index": 0
@@ -1190,47 +1065,7 @@
             "main": [
                 [
                     {
-                        "node": "Check Duplicate",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Check Duplicate": {
-            "main": [
-                [
-                    {
-                        "node": "IF: Duplicate?",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "IF: Duplicate?": {
-            "main": [
-                [
-                    {
-                        "node": "Skip: Already Processed",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
                         "node": "Append PayrollRecord",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Skip: Already Processed": {
-            "main": [
-                [
-                    {
-                        "node": "Split In Batches",
                         "type": "main",
                         "index": 0
                     }

@@ -1,7 +1,18 @@
 # Cold Email — Google Sheets Schema
 
-**Spreadsheet:** To be created
+**Spreadsheet:** Cold Email Outreach — Zelvop
+**Spreadsheet ID:** `1XZFkpgFbidxelGcZZ6_C3YjwktAJOqFbZ9h-AlndcXU`
 **Same rules as cleaning project:** Always use `mode: "id"` for documentId and sheetName
+
+---
+
+## Sheet Tab IDs
+
+| Tab Name | Sheet ID (gid) | Purpose |
+|----------|----------------|---------|
+| `Raw Leads` | `0` | New leads for scoring |
+| `Approved Leads` | `1866609254` | Scored >= 7, ready for email |
+| `Review Queue` | `989136210` | Scored < 7, manual review |
 
 ---
 
@@ -11,19 +22,21 @@ Where you add new leads during research. CE-1 processes these.
 
 | Column | Type | Source | Description |
 |--------|------|--------|-------------|
-| businessName | Text | Manual | Business name |
-| contactName | Text | Manual | Owner/decision maker name |
-| contactEmail | Text | Manual | Email address for outreach |
-| city | Text | Manual | City / metro area |
-| websiteURL | Text | Manual | Business website |
-| googleMapsURL | Text | Manual | Google Maps listing link |
-| notes | Text | Manual | Your research notes |
-| status | Text | CE-1 | PENDING → SCORED |
-| icpScore | Number | CE-1 | 1-10 from Claude |
-| icpReason | Text | CE-1 | One-sentence explanation |
-| painSignal | Text | CE-1 | Specific pain detected |
-| emailAngle | Text | CE-1 | Suggested approach for Email 1 |
-| scoredAt | DateTime | CE-1 | Timestamp of scoring |
+| Row ID | Text | Manual | Unique ID (e.g. ROW-001) |
+| Business Name | Text | Manual | Business name |
+| Owner First Name | Text | Manual | Owner / decision maker first name |
+| Owner Last Name | Text | Manual | Owner / decision maker last name |
+| City | Text | Manual | City / metro area |
+| Business Phone | Text | Manual | Phone number |
+| Website URL | Text | Manual | Business website |
+| Google Maps URL | Text | Manual | Google Maps listing link |
+| Yelp URL | Text | Manual | Yelp listing (optional) |
+| Source | Text | Manual | Where lead came from (e.g. Google Maps) |
+| Date Added | Date | Manual | Date lead was added |
+| Research Notes | Text | Manual | Email source, ICP flags, notes |
+| ICP Score | Number | CE-1 | 1-10 from Claude. Empty = not yet scored |
+
+> **CE-1 filter logic:** only processes rows where `ICP Score` is empty AND `Google Maps URL` is not empty.
 
 ---
 
@@ -34,10 +47,10 @@ Leads scored >= 7, ready for email generation and sequence.
 | Column | Type | Source | Description |
 |--------|------|--------|-------------|
 | businessName | Text | CE-1 | Copied from Raw Leads |
-| contactName | Text | CE-1 | Owner name |
+| contactName | Text | CE-1 | Owner first name |
 | contactEmail | Text | CE-1 | Email for outreach |
 | city | Text | CE-1 | City |
-| icpScore | Number | CE-1 | Score |
+| icpScore | Number | CE-1 | Score (>= 7) |
 | painSignal | Text | CE-1 | Detected pain |
 | emailAngle | Text | CE-1 | Suggested angle |
 | email1Subject | Text | CE-2 | Generated subject line |
@@ -64,7 +77,7 @@ Leads scored < 7, awaiting manual review.
 | Column | Type | Source | Description |
 |--------|------|--------|-------------|
 | businessName | Text | CE-1 | Business name |
-| contactName | Text | CE-1 | Contact |
+| contactName | Text | CE-1 | Owner first name |
 | contactEmail | Text | CE-1 | Email |
 | city | Text | CE-1 | City |
 | icpScore | Number | CE-1 | Score (< 7) |
@@ -99,7 +112,7 @@ Every email sent, for reporting and audit.
 | emailStep | Number | CE-3 | 1, 2, 3, or 4 |
 | subject | Text | CE-3 | Subject line used |
 | sentAt | DateTime | CE-3 | Send timestamp |
-| sentFrom | Text | CE-3 | Sending inbox (for future inbox rotation) |
+| sentFrom | Text | CE-3 | Sending inbox |
 
 ---
 
@@ -119,8 +132,8 @@ Reference templates for Claude's email generation prompt.
 ## Cross-Tab Dependencies
 
 ```
-Raw Leads ──[CE-1]──> Approved Leads (score >= 7)
-                  └──> Review Queue (score < 7)
+Raw Leads ──[CE-1]──> Approved Leads (score >= 7)  +  ICP Score written back
+                  └──> Review Queue (score < 7)     +  ICP Score written back
 
 Approved Leads ──[CE-2]──> email1Subject, email1Body filled
                ──[CE-3]──> status, currentStep, lastSendDate updated

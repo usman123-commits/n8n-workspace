@@ -14,81 +14,21 @@
       "typeVersion": 2,
       "position": [
         -208,
-        208
+        296
       ],
       "webhookId": "49fde8af-2417-4b10-985c-e504c86af9b7"
     },
     {
       "parameters": {
-        "jsCode": "// Normalize field names: accept React camelCase OR Google Sheets column names.\n// Webhook nests POST body under $json.body \u00e2\u20ac\u201d unwrap it.\nconst raw = $input.first().json;\nconst item = raw.body || raw;\nconst normalized = {\n  'Booking ID':       (item.bookingId       || item['Booking ID']       || '').toString().trim(),\n  'Cleaner ID':       (item.cleanerId        || item['Cleaner ID']       || '').toString().trim(),\n  'Confirm Arrival':  (item.confirmArrival   || item['Confirm Arrival']  || '').toString().trim(),\n  'Capture Location': (item.captureLocation  || item['Capture Location'] || '').toString().trim(),\n  'submittedAt':      (item.submittedAt      || item['Timestamp']        || new Date().toISOString()),\n};\nconst captureLocation = normalized['Capture Location'];\nconst isShortLink = /^(https?:\\/\\/)?(www\\.)?(maps\\.app\\.goo\\.gl|goo\\.gl\\/maps)\\/\\S+/i.test(captureLocation);\nreturn [{ json: { ...normalized, captureLocation, isShortLink } }];"
+        "jsCode": "// Normalize field names from the React webhook payload.\n// Webhook nests POST body under $json.body \u2014 unwrap it.\nconst raw = $input.first().json;\nconst item = raw.body || raw;\nconst captureLocation = (item.captureLocation || item['Capture Location'] || '').toString().trim();\nreturn [{ json: {\n  'Booking ID':       (item.bookingId       || item['Booking ID']      || '').toString().trim(),\n  'Cleaner ID':       (item.cleanerId       || item['Cleaner ID']      || '').toString().trim(),\n  'Confirm Arrival':  (item.confirmArrival  || item['Confirm Arrival'] || '').toString().trim(),\n  'Capture Location': captureLocation,\n  'submittedAt':      (item.submittedAt     || item['Timestamp']       || new Date().toISOString()),\n  captureLocation\n} }];"
       },
       "id": "823be718-3a8f-42fb-97d8-74920870425d",
       "name": "Normalize and Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        48,
-        208
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "short",
-              "leftValue": "={{ $json.isShortLink }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "de6d6555-3493-4d2a-926a-df3e382fec8c",
-      "name": "Is Short Link?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        528,
-        208
-      ]
-    },
-    {
-      "parameters": {
-        "url": "={{ $json.captureLocation }}",
-        "options": {}
-      },
-      "id": "8e1a78f9-9f1e-472f-b28c-0c037b99244b",
-      "name": "Resolve Short Link",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        768,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Parse coords from HTTP response body.\ntry {\n  const form = $('Normalize and Check').first().json;\n  const get = (name) => { const v = form[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(form).find(k => k.trim() === name); return key !== undefined ? form[key] : undefined; };\n  const bookingUid = get('Booking ID');\n  const fixedCleanerId = get('Cleaner ID');\n  const confirmArrival = (get('Confirm Arrival') ?? '').toString().trim();\n  if (!confirmArrival || confirmArrival.toLowerCase() !== 'yes') throw new Error('Arrival not confirmed');\n\n  const resp = $input.first().json;\n  const raw = (resp.data != null ? resp.data : resp.body != null ? resp.body : typeof resp === 'string' ? resp : JSON.stringify(resp));\n  const str = typeof raw === 'string' ? raw : String(raw);\n  let m = str.match(/q=(-?\\d+\\.\\d+)%2C(-?\\d+\\.\\d+)/);\n  if (!m) m = str.match(/(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);\n  if (!m) m = str.match(/3d(-?\\d+\\.\\d+)[^4]*4d(-?\\d+\\.\\d+)/);\n  if (!m) throw new Error('Could not find coordinates in short link response.');\n\n  return [{ json: { bookingUid, fixedCleanerId, gpsLat: m[1], gpsLng: m[2], submissionTimestamp: new Date().toISOString(), processingStatus: 'PENDING', resultMessage: '', processedAt: '', hasError: false } }];\n} catch (err) {\n  const form = $('Normalize and Check').first().json;\n  const get = (name) => { const v = form[name]; if (v !== undefined && v !== null) return v; const key = Object.keys(form).find(k => k.trim() === name); return key !== undefined ? form[key] : undefined; };\n  return [{ json: { hasError: true, errorMessage: err.message, bookingUid: get('Booking ID') || 'unknown', fixedCleanerId: get('Cleaner ID') || '', submissionTimestamp: new Date().toISOString() } }];\n}"
-      },
-      "id": "b46b140e-42c8-4f29-9ad8-73c8dbca67a2",
-      "name": "Parse Short Link Response",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1008,
-        0
+        16,
+        296
       ]
     },
     {
@@ -100,8 +40,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        768,
-        400
+        688,
+        392
       ]
     },
     {
@@ -133,8 +73,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1248,
-        208
+        912,
+        296
       ]
     },
     {
@@ -169,8 +109,8 @@
       "typeVersion": 4.5,
       "alwaysOutputData": true,
       "position": [
-        1488,
-        400
+        1136,
+        488
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -181,15 +121,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const existing = $input.all();\nlet parsed;\nlet parsedFromShortLink;\nlet parsedFromDirect;\ntry { parsedFromShortLink = $('Parse Short Link Response').first().json; } catch (_) {}\ntry { parsedFromDirect = $('ParseAndValidate').first().json; } catch (_) {}\n\nif (parsedFromShortLink && parsedFromDirect) {\n  const tsA = new Date(parsedFromShortLink.submissionTimestamp || 0).getTime();\n  const tsB = new Date(parsedFromDirect.submissionTimestamp || 0).getTime();\n  parsed = tsA >= tsB ? parsedFromShortLink : parsedFromDirect;\n} else {\n  parsed = parsedFromShortLink || parsedFromDirect;\n}\nif (!parsed) throw new Error('Missing parsed submission');\n\nconst hasApproved = existing.some(i =>\n  (i.json?.processingStatus ?? '').toString().trim() === 'APPROVED');\nif (hasApproved) return [{ json: { skipInsert: true, bookingUid: parsed.bookingUid } }];\nreturn [{ json: { ...parsed, skipInsert: false } }];"
+        "jsCode": "// Check if there's already an APPROVED row for this bookingUid.\n// If yes, short-circuit and don't insert a new one.\nconst existing = $input.all();\nconst parsed = $('ParseAndValidate').first().json;\nif (!parsed) throw new Error('Missing parsed submission');\nconst hasApproved = existing.some(i =>\n  (i.json?.processingStatus ?? '').toString().trim() === 'APPROVED');\nif (hasApproved) return [{ json: { skipInsert: true, bookingUid: parsed.bookingUid } }];\nreturn [{ json: { ...parsed, skipInsert: false } }];"
       },
       "id": "5d028ffa-fe78-41e5-8924-045920b9e89f",
       "name": "Reject If Already Approved",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1728,
-        400
+        1424,
+        488
       ]
     },
     {
@@ -221,8 +161,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1968,
-        400
+        1712,
+        488
       ]
     },
     {
@@ -335,8 +275,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        2208,
-        304
+        1936,
+        392
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -347,109 +287,25 @@
     },
     {
       "parameters": {
-        "jsCode": "const ADMIN_EMAIL = 'bgmazak123@gmail.com';\nconst fixedCleanerId = $json.fixedCleanerId || '';\nconst errorMessage = $json.errorMessage || 'Unknown error';\nconst bookingUid = $json.bookingUid || 'unknown';\n\nconst cleanerMap = {\n  '218jieksiei20iw0-ks2kwi219':      { email: 'bgmazak123@gmail.com',             name: 'Usman' },\n  'iwshwh38e8jsij28e892js21j2':      { email: 'nomiads222@gmail.com',             name: 'Nouman' },\n  'iwshwh3eeeesij28e892js21j2':      { email: 'noumanyounask@gmail.com',          name: 'Ali' },\n  'iwshwh3eeeeansaksjasjasjajs':     { email: 'office@daydrinkingproperties.com', name: 'David Schmutz' },\n  'jsljdjldjsljdjsdjsjdxmmxmxmxks':  { email: 'Kelly@daydrinkingproperties.com',  name: 'Kelly Williamson' },\n  'eb68f11d-c077-409b-a3':           { email: 'sdrenske86@gmail.com',             name: 'Sarah Drenske' },\n  'jsljdjldjsljdjsc2-ba96d3bf8af2':  { email: 'hollie.featherstone@gmail.com',    name: 'Hollie Featherstone' }\n};\n\nlet recipientEmail = ADMIN_EMAIL;\nlet recipientName = 'Admin';\nif (fixedCleanerId && cleanerMap[fixedCleanerId]) {\n  recipientEmail = cleanerMap[fixedCleanerId].email;\n  recipientName  = cleanerMap[fixedCleanerId].name;\n}\nreturn [{ json: { recipientEmail, recipientName, errorMessage, bookingUid, fixedCleanerId, submissionTimestamp: $json.submissionTimestamp || new Date().toISOString() } }];"
-      },
-      "id": "24e10540-5487-4614-a0e4-57ab47b18579",
-      "name": "Resolve Recipient",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1488,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "={\"contents\":[{\"parts\":[{\"text\":\"You are an error message simplifier for a cleaning company automated system. A cleaner submitted a clock-in form and the system encountered an error. Explain the error in simple, friendly language that a cleaner can understand. Keep it to 2-3 sentences max. No technical jargon. If the error is about coordinates or GPS, say the location was not recognized please go under 100 meter radius of the property. If about arrival confirmation, say they need to confirm arrival. Always suggest what they can do to fix it. Original error: {{ $json.errorMessage }} Booking ID: {{ $json.bookingUid }} Cleaner: {{ $json.recipientName }} Write the simplified message only.\"}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":200}}"
-      },
-      "id": "b5bac028-fcbd-4175-a40a-18ca4dfeabbb",
-      "name": "Basic LLM Chain",
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.4,
-      "position": [
-        1728,
-        0
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "id": "f70de53f-7618-4ed2-aa04-60269c5fee4e",
-      "name": "Google Gemini Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1,
-      "position": [
-        1728,
-        208
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "G4BlsVg8cIwBbbbD",
-          "name": "Usman2Account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const prev = $('Resolve Recipient').first().json;\nconst geminiResp = $input.first().json;\nlet simplifiedError = prev.errorMessage;\ntry { simplifiedError = geminiResp.candidates[0].content.parts[0].text.trim(); } catch (e) {}\nreturn [{ json: { ...prev, simplifiedError } }];"
-      },
-      "id": "9986e7d5-a518-45fb-a4e5-b50ac49174ff",
-      "name": "Extract Simplified Error",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1968,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "sendTo": "={{ $json.recipientEmail }}",
-        "subject": "=Clock-In Error \u00e2\u20ac\u201d Booking {{ $json.bookingUid }}",
-        "emailType": "text",
-        "message": "={{ $('Basic LLM Chain').item.json.text }}\n\n\u00e2\u20ac\u201d Cleaning Operations System",
-        "options": {}
-      },
-      "id": "99d6b5c2-745b-4718-951b-b97cd51ed8bc",
-      "name": "Send Error Email",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [
-        2208,
-        0
-      ],
-      "webhookId": "c3bdcef8-1387-49ce-88b2-80d3eed10fd3",
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "6sr232YN6z3c4tiW",
-          "name": "Gmail account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"status\": \"success\",\n  \"message\": \"Clock-in submitted successfully\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
+        "responseBody": "={\n  \"status\": \"approved\",\n  \"message\": \"Clock-in confirmed. You are within the allowed radius. Proceed with cleaning.\",\n  \"bookingUid\": \"{{ $('Radius Check').item.json.bookingUid }}\"\n}",
         "options": {
           "responseCode": 200
         }
       },
       "id": "6bba6d28-0ced-4807-a8f1-6b06c347058c",
-      "name": "Respond Success",
+      "name": "Respond Approved",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2448,
-        304
+        2160,
+        296
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"status\": \"skipped\",\n  \"message\": \"Clock-in already approved for this booking\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
+        "responseBody": "={\n  \"status\": \"duplicate\",\n  \"message\": \"Clock-in already recorded for this booking.\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
         "options": {
           "responseCode": 200
         }
@@ -459,14 +315,14 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2448,
-        512
+        1936,
+        584
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"{{ $json.simplifiedError || $json.errorMessage || 'Unknown error' }}\"\n}",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"{{ $json.errorMessage || 'Invalid submission' }}\"\n}",
         "options": {
           "responseCode": 400
         }
@@ -476,23 +332,23 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2448,
-        0
+        1936,
+        200
       ]
     },
     {
       "parameters": {
         "content": "## Workflow 3W \u00e2\u20ac\u201d Clock-In Ingestion (Webhook)\n\n**Replaces Workflow 3** (Google Sheets Trigger version).\nReceives POST from React Clock-In page at `/webhook/clockin`.\n\n**Flow:** Webhook \u00e2\u2020\u2019 Normalize \u00e2\u2020\u2019 Append Raw (audit) \u00e2\u2020\u2019 GPS parse \u00e2\u2020\u2019 Duplicate check \u00e2\u2020\u2019 Insert to ClockInSubmissions\n\n**Response codes:**\n- 200 `{status: 'success'}` \u00e2\u20ac\u201d inserted\n- 200 `{status: 'skipped'}` \u00e2\u20ac\u201d duplicate (already approved)\n- 400 `{status: 'error'}` \u00e2\u20ac\u201d validation failed + error email sent",
-        "height": 260,
-        "width": 800
+        "height": 420,
+        "width": 864
       },
       "id": "32cc4f74-a073-4d15-990a-af06002f66df",
       "name": "Sticky Note1",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -208,
-        -144
+        -352,
+        -192
       ]
     },
     {
@@ -522,8 +378,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        1272,
-        1208
+        2384,
+        488
       ],
       "notesInFlow": false,
       "credentials": {
@@ -532,7 +388,8 @@
           "name": "Google Sheets account"
         }
       },
-      "notes": "Looks up the CleaningJobs row by bookingUid.\nWhy: we need the assigned cleanerId and propertyUid to validate against."
+      "notes": "Looks up the CleaningJobs row by bookingUid.\nWhy: we need the assigned cleanerId and propertyUid to validate against.",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -543,8 +400,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1720,
-        1208
+        2832,
+        488
       ],
       "notesInFlow": false,
       "notes": "Combines the submission data with the CleaningJobs data.\nWhy: validation needs both the form submission and the job details in one object."
@@ -578,8 +435,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1944,
-        1208
+        3056,
+        488
       ],
       "notesInFlow": false,
       "notes": "Checks if cleanerIdFromForm matches cleanerId in CleaningJobs.\nWhy: only the assigned cleaner should be able to clock in for a job."
@@ -707,8 +564,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        2168,
-        1016
+        3280,
+        296
       ],
       "notesInFlow": false,
       "credentials": {
@@ -728,8 +585,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2168,
-        1208
+        3280,
+        488
       ],
       "notesInFlow": false,
       "notes": "Passes through items that passed cleaner validation.\nWhy: holds them for the merge with property coordinates."
@@ -743,8 +600,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2616,
-        1400
+        3728,
+        680
       ],
       "notesInFlow": false,
       "notes": "Combines submission+job data with property coordinates by position.\nWhy: the distance calculation needs both GPS points in one object."
@@ -776,8 +633,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        2168,
-        1400
+        3280,
+        680
       ],
       "notesInFlow": false,
       "credentials": {
@@ -786,7 +643,8 @@
           "name": "Google Sheets account"
         }
       },
-      "notes": "Looks up latitude/longitude from the Properties tab by propertyUid.\nWhy: we compare the cleaner's GPS against the property location."
+      "notes": "Looks up latitude/longitude from the Properties tab by propertyUid.\nWhy: we compare the cleaner's GPS against the property location.",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -797,8 +655,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2840,
-        1400
+        3952,
+        680
       ],
       "notesInFlow": false,
       "notes": "Haversine formula: calculates meters between cleaner GPS and property GPS.\nWhy: determines if the cleaner is physically at the property."
@@ -832,8 +690,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        3064,
-        1400
+        4176,
+        680
       ],
       "notesInFlow": false,
       "notes": "Branches: TRUE = within 100m (approve), FALSE = too far (reject).\nWhy: 100m radius ensures the cleaner is actually on-site."
@@ -961,8 +819,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        3288,
-        1208
+        4400,
+        488
       ],
       "notesInFlow": false,
       "credentials": {
@@ -1267,8 +1125,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        3512,
-        1208
+        4624,
+        488
       ],
       "notesInFlow": false,
       "credentials": {
@@ -1402,8 +1260,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        3288,
-        1496
+        4400,
+        776
       ],
       "notesInFlow": false,
       "credentials": {
@@ -1424,8 +1282,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2392,
-        1400
+        3504,
+        680
       ],
       "id": "a40a2b41-a5fa-4489-9f2e-c703971abd9d",
       "name": "Refining feilds",
@@ -1445,8 +1303,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1496,
-        1208
+        2608,
+        488
       ],
       "id": "cacae900-8282-4718-b94c-6f32f548f8c5",
       "name": "Edit Fields",
@@ -1464,8 +1322,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        3960,
-        1400
+        5072,
+        680
       ],
       "id": "f2749079-8c52-4568-a47e-2b026d9905ea",
       "name": "Send Rejected message",
@@ -1477,15 +1335,16 @@
           "name": "Gmail account"
         }
       },
-      "notes": "Emails the cleaner that their clock-in was rejected.\nWhy: cleaner needs to know they must go to the correct location and try again."
+      "notes": "Emails the cleaner that their clock-in was rejected.\nWhy: cleaner needs to know they must go to the correct location and try again.",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        3960,
-        1592
+        5072,
+        872
       ],
       "id": "6e8e1414-899b-4ec8-a40b-310c038c1921",
       "name": "No Operation, do nothing",
@@ -1517,8 +1376,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        3512,
-        1496
+        4624,
+        776
       ],
       "id": "1991e8ce-ade3-40d1-9414-1819f169ed0a",
       "name": "Getting Cleaners Profile",
@@ -1559,8 +1418,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3736,
-        1496
+        4848,
+        776
       ],
       "id": "b85c7e24-80b6-4549-aa05-a882f2856cf9",
       "name": "Checking If Cleaner Exists",
@@ -1737,8 +1596,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        3736,
-        1208
+        4848,
+        488
       ],
       "id": "196c4e40-d807-4377-a8e1-f0f552684950",
       "name": "Updating Status in Reservation",
@@ -1762,8 +1621,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        3960,
-        1208
+        5072,
+        488
       ],
       "id": "9d9af1c5-d388-4e33-a1bd-3c42da1edda8",
       "name": "Send Aprooved Message",
@@ -1775,7 +1634,8 @@
           "name": "Gmail account"
         }
       },
-      "notes": "Emails the cleaner confirming their clock-in was accepted.\nWhy: cleaner gets confirmation they are checked in and can start cleaning."
+      "notes": "Emails the cleaner confirming their clock-in was accepted.\nWhy: cleaner gets confirmation they are checked in and can start cleaning.",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1788,8 +1648,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        568,
-        1512
+        576,
+        1520
       ]
     },
     {
@@ -1803,8 +1663,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1160,
-        1512
+        1168,
+        1520
       ]
     },
     {
@@ -1819,8 +1679,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1448,
-        1512
+        1456,
+        1520
       ]
     },
     {
@@ -1834,8 +1694,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2088,
-        824
+        2096,
+        832
       ]
     },
     {
@@ -1849,8 +1709,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1768,
-        1784
+        1776,
+        1792
       ]
     },
     {
@@ -1864,8 +1724,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2376,
-        1784
+        2384,
+        1792
       ]
     },
     {
@@ -1879,8 +1739,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1752,
-        1512
+        1760,
+        1520
       ]
     },
     {
@@ -1894,8 +1754,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2680,
-        1784
+        2688,
+        1792
       ]
     },
     {
@@ -1909,8 +1769,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2984,
-        1784
+        2992,
+        1792
       ]
     },
     {
@@ -1924,8 +1784,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2984,
-        968
+        2992,
+        976
       ]
     },
     {
@@ -1939,8 +1799,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        3368,
-        968
+        3376,
+        976
       ]
     },
     {
@@ -1954,8 +1814,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        3304,
-        1768
+        3312,
+        1776
       ]
     },
     {
@@ -1969,8 +1829,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2056,
-        1784
+        2064,
+        1792
       ]
     },
     {
@@ -1984,8 +1844,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        872,
-        1512
+        880,
+        1520
       ]
     },
     {
@@ -2000,8 +1860,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        4184,
-        1192
+        4192,
+        1200
       ]
     },
     {
@@ -2015,8 +1875,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        4264,
-        1416
+        4272,
+        1424
       ]
     },
     {
@@ -2030,8 +1890,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        3592,
-        1752
+        3600,
+        1760
       ]
     },
     {
@@ -2045,8 +1905,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        3928,
-        1736
+        3936,
+        1744
       ]
     },
     {
@@ -2060,8 +1920,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        3640,
-        968
+        3648,
+        976
       ]
     },
     {
@@ -2075,23 +1935,12 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        3960,
-        968
+        3968,
+        976
       ]
     },
     {
-      "id": "5899d49c-4d6a-47bc-8f41-da96e7ef5259",
-      "name": "Lookup Inserted Row",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        2448,
-        484
-      ],
       "parameters": {
-        "authentication": "oAuth2",
-        "resource": "sheet",
-        "operation": "read",
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
@@ -2114,10 +1963,206 @@
           "returnFirstMatch": true
         }
       },
+      "id": "5899d49c-4d6a-47bc-8f41-da96e7ef5259",
+      "name": "Lookup Inserted Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2160,
+        488
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "q52dbWoN6OaKRDZO",
           "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e5979704-18f5-448e-b3fe-075910600cbe",
+      "name": "Inserted Row Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2280,
+        488
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "72d3d451-27c5-49db-90b2-f0e79fb296c4",
+              "leftValue": "={{ $json.bookingUid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5926c1ea-fce8-4e6a-b2a4-86768d54b50a",
+      "name": "Booking Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2520,
+        488
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c3f7037d-2d31-48b6-8edd-42b1e33f8743",
+              "leftValue": "={{ $json.cleaningJobId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3285c17c-e95f-4973-b34d-47cdce71f473",
+      "name": "Property Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3440,
+        680
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "d4d27a26-dc47-4bda-a602-4b918105791e",
+              "leftValue": "={{ $json.latitude }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "510141c2-19c7-4a71-9b43-46cf779a86f8",
+      "name": "Respond Insert Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2280,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Clock-in could not be saved. Please try again. If this keeps happening, contact admin.\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "81a1e19b-c141-4d9f-a4d1-46ba8bb2b350",
+      "name": "Respond Booking Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2520,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Booking not found in system. Please verify the booking ID or contact admin.\"\n}",
+        "options": {
+          "responseCode": 404
+        }
+      }
+    },
+    {
+      "id": "59336703-edf8-4e5e-acce-b7dc63264296",
+      "name": "Respond Property Missing",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3440,
+        880
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Property coordinates not configured. Please contact admin.\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "490737d4-4374-4742-8065-73cae55dddbb",
+      "name": "Respond Cleaner Not Assigned",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3520,
+        296
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"rejected\",\n  \"reason\": \"cleaner_mismatch\",\n  \"message\": \"You are not assigned to this booking. Please contact admin.\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    },
+    {
+      "id": "2c14ad28-1ff1-448e-a76e-31b2ccd794fe",
+      "name": "Respond Outside Radius",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        5320,
+        776
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"rejected\",\n  \"reason\": \"outside_radius\",\n  \"message\": \"Your location is outside the allowed 100m radius. Please move closer to the property and try again.\",\n  \"bookingUid\": \"{{ $('Radius Check').item.json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 403
         }
       }
     }
@@ -2138,47 +2183,7 @@
       "main": [
         [
           {
-            "node": "Is Short Link?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Is Short Link?": {
-      "main": [
-        [
-          {
-            "node": "Resolve Short Link",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "ParseAndValidate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Resolve Short Link": {
-      "main": [
-        [
-          {
-            "node": "Parse Short Link Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Short Link Response": {
-      "main": [
-        [
-          {
-            "node": "Has Error?",
             "type": "main",
             "index": 0
           }
@@ -2200,7 +2205,7 @@
       "main": [
         [
           {
-            "node": "Resolve Recipient",
+            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
@@ -2208,55 +2213,6 @@
         [
           {
             "node": "Lookup Existing ClockIn",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Resolve Recipient": {
-      "main": [
-        [
-          {
-            "node": "Basic LLM Chain",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Google Gemini Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Basic LLM Chain",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Basic LLM Chain": {
-      "main": [
-        [
-          {
-            "node": "Extract Simplified Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Simplified Error": {
-      "main": [
-        [
-          {
-            "node": "Send Error Email",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
@@ -2307,11 +2263,6 @@
       "main": [
         [
           {
-            "node": "Respond Success",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Lookup Inserted Row",
             "type": "main",
             "index": 0
@@ -2323,7 +2274,7 @@
       "main": [
         [
           {
-            "node": "Edit Fields",
+            "node": "Booking Found?",
             "type": "main",
             "index": 0
           }
@@ -2368,7 +2319,7 @@
       "main": [
         [
           {
-            "node": "Refining feilds",
+            "node": "Property Found?",
             "type": "main",
             "index": 0
           }
@@ -2514,7 +2465,105 @@
       "main": [
         [
           {
+            "node": "Inserted Row Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserted Row Found?": {
+      "main": [
+        [
+          {
             "node": "Get Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Insert Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Found?": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Booking Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Property Found?": {
+      "main": [
+        [
+          {
+            "node": "Refining feilds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Property Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Cleaner Not Assigned": {
+      "main": [
+        [
+          {
+            "node": "Respond Cleaner Not Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Aprooved Message": {
+      "main": [
+        [
+          {
+            "node": "Respond Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Rejected message": {
+      "main": [
+        [
+          {
+            "node": "Respond Outside Radius",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "Respond Outside Radius",
             "type": "main",
             "index": 0
           }
