@@ -1,0 +1,17 @@
+{
+  "bookingId": "02804d28-0459-43f1-a30c-d3c967b366cf",
+  "cleanerId": "218jieksiei20iw0-ks2kwi219",
+  "confirmCheckout": "yes",
+  "captureLocation": "36.1644189,-86.659628",
+  "issueReported": "No",
+  "issueType": "",
+  "issueDescription": "",
+  "photoUrls": [],
+  "issuePriority": "",
+  "supplies": [
+    { "itemName": "Trash Bags", "quantityUsed": 2 },
+    { "itemName": "All-Purpose Cleaner", "quantityUsed": 1 }
+  ],
+  "lowStockAlert": "",
+  "submittedAt": "2026-04-28T16:00:00.000Z"
+}

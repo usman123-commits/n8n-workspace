@@ -1,0 +1,2598 @@
+{
+  "name": "Workflow 4W — Checkout Ingestion + Validation (Merged)",
+  "nodes": [
+    {
+      "id": "4w000001-0000-0000-0000-000000000002",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        200
+      ],
+      "webhookId": "7a3f91b2-cc4d-48e1-a5f7-2b8c0e14d96a",
+      "parameters": {
+        "path": "checkout",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000003",
+      "name": "Normalize and Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2150,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Normalize field names: accept React camelCase OR Google Forms column names.\n// Webhook nests POST body under $json.body -- unwrap it.\nconst raw = $input.first().json;\nconst item = raw.body || raw;\nconst get = (name) => {\n  const v = item[name];\n  if (v !== undefined && v !== null) return v;\n  const key = Object.keys(item).find(k => k.trim() === name);\n  return key !== undefined ? item[key] : undefined;\n};\n\nconst bookingUid        = (item.bookingId        || get('Booking ID')                       || '').toString().trim();\nconst cleanerIdFromForm = (item.cleanerId         || get('Cleaner ID')                       || '').toString().trim();\nconst confirmCheckout   = (item.confirmCheckout   || get('Confirm Checkout')                 || '').toString().trim();\nconst captureLocation   = (item.captureLocation   || get('Capture Location (GPS)')           || get('Capture Location') || '').toString().trim();\nconst submittedAt       = (item.submittedAt       || get('Timestamp')                        || new Date().toISOString()).toString();\n\nconst issueReported = (item.issueReported     || get('Any maintenance issues to report?') || '').toString().trim();\nconst issueType     = (item.issueType         || get('Issue Type')                        || '').toString().trim();\nconst description   = (item.issueDescription  || get('Issue Description')                || '').toString().trim();\nconst photoUrl      = (Array.isArray(item.photoUrls) ? item.photoUrls.join(',') : (item.photoUrls || get('Photo of Issue') || '')).toString().trim();\nconst priority      = (item.issuePriority     || get('Issue Priority')                    || '').toString().trim();\nconst lowStockAlert = (item.lowStockAlert     || get('Low Stock Alert')                   || '').toString().trim();\n\nconst supplyColMap = {\n  'Trash Bags \\u2014 Qty Used':          'Trash Bags',\n  'All-Purpose Cleaner \\u2014 Qty Used': 'All-Purpose Cleaner',\n  'Glass Cleaner \\u2014 Qty Used':       'Glass Cleaner',\n  'Disinfectant \\u2014 Qty Used':        'Disinfectant',\n  'Toilet Cleaner \\u2014 Qty Used':      'Toilet Cleaner',\n  'Floor Cleaner \\u2014 Qty Used':       'Floor Cleaner',\n  'Sponges \\u2014 Qty Used':             'Sponges',\n  'Paper Towels \\u2014 Qty Used':        'Paper Towels',\n  'Laundry Detergent \\u2014 Qty Used':   'Laundry Detergent',\n  'Fabric Softener \\u2014 Qty Used':     'Fabric Softener',\n  'Dish Soap \\u2014 Qty Used':           'Dish Soap',\n  'Air Freshener \\u2014 Qty Used':       'Air Freshener',\n  'Microfiber Cloths \\u2014 Qty Used':   'Microfiber Cloths',\n  'Mop Pads \\u2014 Qty Used':            'Mop Pads'\n};\n\nlet supplies = [];\nif (Array.isArray(item.supplies)) {\n  // React app format: [{itemName, quantityUsed}]\n  supplies = item.supplies.filter(s => s && s.itemName && parseInt(s.quantityUsed, 10) > 0)\n             .map(s => ({ itemName: s.itemName, quantityUsed: parseInt(s.quantityUsed, 10) }));\n} else if (item.supplies && typeof item.supplies === 'object') {\n  // Flat object format: {name: qty}\n  for (const [itemName, qty] of Object.entries(item.supplies)) {\n    const q = parseInt(qty, 10);\n    if (!isNaN(q) && q > 0) supplies.push({ itemName, quantityUsed: q });\n  }\n} else {\n  // Google Forms column format\n  for (const [col, itemName] of Object.entries(supplyColMap)) {\n    const raw = (get(col) || '').toString().trim();\n    const qty = raw === '' ? 0 : parseInt(raw, 10);\n    if (!isNaN(qty) && qty > 0) supplies.push({ itemName, quantityUsed: qty });\n  }\n}\n\nconst isShortLink = /^(https?:\\/\\/)?(www\\.)?(maps\\.app\\.goo\\.gl|goo\\.gl\\/maps)\\/\\S+/i.test(captureLocation);\n\nreturn [{ json: {\n  bookingUid, cleanerIdFromForm, confirmCheckout, captureLocation, isShortLink,\n  submittedAt, issueReported, issueType, description, photoUrl, priority, lowStockAlert, supplies\n} }];"
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000007",
+      "name": "ParseAndValidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1900,
+        200
+      ],
+      "parameters": {
+        "jsCode": "try {\n  const form = $('Normalize and Check').first().json;\n  if (!form.bookingUid) throw new Error('Booking ID is missing');\n  if (!form.cleanerIdFromForm) throw new Error('Cleaner ID is missing');\n  if (!form.confirmCheckout || form.confirmCheckout.toLowerCase() !== 'yes') throw new Error('Checkout not confirmed');\n  if (!form.captureLocation) throw new Error('Location link missing');\n\n  function parseLatLngFromString(str) {\n    const m = str.match(/(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);\n    if (m) return { lat: m[1], lng: m[2] };\n    const dmsRegex = /(\\d+)[\\u00b0\\u00ba]\\s*(\\d+)['\\u2032']\\s*([\\d.]+)[\"\\u2033]?\\s*([NS])\\s*(\\d+)[\\u00b0\\u00ba]\\s*(\\d+)['\\u2032']\\s*([\\d.]+)[\"\\u2033]?\\s*([EW])/i;\n    const dms = str.match(dmsRegex);\n    if (!dms) return null;\n    const latSign = dms[4].toUpperCase() === 'S' ? -1 : 1;\n    const lngSign = dms[8].toUpperCase() === 'W' ? -1 : 1;\n    const lat = latSign * (parseInt(dms[1],10) + parseInt(dms[2],10)/60 + parseFloat(dms[3])/3600);\n    const lng = lngSign * (parseInt(dms[5],10) + parseInt(dms[6],10)/60 + parseFloat(dms[7])/3600);\n    return { lat: String(lat), lng: String(lng) };\n  }\n  const parsed = parseLatLngFromString(form.captureLocation);\n  const gpsLat = parsed ? parsed.lat : '';\n  const gpsLng = parsed ? parsed.lng : '';\n\n  return [{ json: {\n    ...form,\n    gpsLat, gpsLng,\n    submissionTimestamp: form.submittedAt,\n    processingStatus: 'PENDING', resultMessage: '', processedAt: '',\n    hasError: false\n  } }];\n} catch (err) {\n  const form = $('Normalize and Check').first().json;\n  return [{ json: { hasError: true, errorMessage: err.message, bookingUid: form.bookingUid || 'unknown', cleanerIdFromForm: form.cleanerIdFromForm || '', submissionTimestamp: form.submittedAt || new Date().toISOString() } }];\n}"
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000008",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1650,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "err-check",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000014",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1400,
+        350
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"{{ $json.errorMessage || 'Unknown error' }}\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000015",
+      "name": "Lookup Existing Checkout",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "alwaysOutputData": true,
+      "position": [
+        -1400,
+        100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1292187736",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            },
+            {
+              "lookupColumn": "processingStatus",
+              "lookupValue": "APPROVED"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000016",
+      "name": "Reject If Already Approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1150,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const existing = $input.all();\nconst parsed = $('ParseAndValidate').first().json;\nif (!parsed || parsed.hasError) throw new Error('Missing parsed submission');\nconst hasApproved = existing.some(i => (i.json?.processingStatus ?? '').toString().trim() === 'APPROVED');\nif (hasApproved) return [{ json: { skipInsert: true, bookingUid: parsed.bookingUid } }];\nreturn [{ json: { ...parsed, skipInsert: false } }];"
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000017",
+      "name": "Should Insert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "do-insert",
+              "leftValue": "={{ $json.skipInsert }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000020",
+      "name": "Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -650,
+        250
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"duplicate\",\n  \"message\": \"Checkout already recorded for this booking.\",\n  \"bookingUid\": \"{{ $json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000018",
+      "name": "Insert into CheckoutSubmissions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -650,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1292187736",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleanerIdFromForm": "={{ $json.cleanerIdFromForm }}",
+            "gpsLat": "={{ $json.gpsLat }}",
+            "gpsLng": "={{ $json.gpsLng }}",
+            "submissionTimestamp": "={{ $json.submissionTimestamp }}",
+            "processingStatus": "={{ $json.processingStatus }}",
+            "resultMessage": "={{ $json.resultMessage }}",
+            "processedAt": "={{ $json.processedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gpsLat",
+              "displayName": "gpsLat",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gpsLng",
+              "displayName": "gpsLng",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submissionTimestamp",
+              "displayName": "submissionTimestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processingStatus",
+              "displayName": "processingStatus",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultMessage",
+              "displayName": "resultMessage",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processedAt",
+              "displayName": "processedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aa91e54e-8949-4a80-83f0-eae84799cb39",
+      "name": "Lookup Inserted Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -400,
+        100
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1292187736",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $('Reject If Already Approved').first().json.bookingUid }}"
+            },
+            {
+              "lookupColumn": "submissionTimestamp",
+              "lookupValue": "={{ $('Reject If Already Approved').first().json.submissionTimestamp }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "5efdae21-dc4c-41e0-84c8-3f5c637b93c1",
+      "name": "Inserted Row Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -150,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "17bd5d27-b054-453a-86f3-8d956eab646d",
+              "leftValue": "={{ $json.row_number }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9f1393fc-788e-4a28-9107-9f384dba8e98",
+      "name": "Respond Insert Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        100,
+        250
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Checkout could not be saved. Please try again. If this keeps happening, contact admin.\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "2047086003",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000005",
+      "name": "Get Booking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        100,
+        0
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Looks up the CleaningJobs row by bookingUid.\nWhy: need fixedCleanerId, status, clockInTimeUTC, and propertyUid to validate against.",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "523c488d-1d8b-401c-8658-021098e4704d",
+      "name": "Booking Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        350,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5ef8232a-f46f-49ab-bc3d-98ca7ca9c151",
+              "leftValue": "={{ $json.cleanerId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8dbec8cc-31ac-4b00-832b-eb5640d928fb",
+      "name": "Respond Booking Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        600,
+        250
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Booking not found in system. Please verify the booking ID or contact admin.\"\n}",
+        "options": {
+          "responseCode": 404
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge inserted-row submission with its CleaningJobs row.\n// Explicitly keep submission's row_number so downstream Sheets updates\n// target the correct CheckoutSubmissions row, not the CleaningJobs row.\nconst submissionItems = $('Lookup Inserted Row').all();\nconst jobItems = $input.all();\nreturn jobItems.map((jobItem, i) => {\n  const submission = submissionItems[i]?.json || {};\n  const job = jobItem.json || {};\n  return { json: { ...submission, ...job, row_number: submission.row_number } };\n});"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000006",
+      "name": "Merge Submission and Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ],
+      "notesInFlow": false,
+      "notes": "Combines the checkout submission data with the CleaningJobs data by position index.\nWhy: validation needs both the form submission and the job details in one object."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run all pre-GPS validations: cleaner match, clock-in status, duration min/max.\nconst items = $input.all();\nreturn items.map(item => {\n  const j = item.json || {};\n  const cleanerFromForm = (j.cleanerIdFromForm ?? '').toString().trim();\n  const assignedCleaner = (j.cleanerId ?? '').toString().trim();\n  if (!cleanerFromForm || !assignedCleaner || cleanerFromForm !== assignedCleaner) {\n    return { json: { ...j, validationPass: 'FAIL', validationReason: 'cleaner_mismatch', validationMsg: 'You are not assigned to this booking. Please contact admin.' } };\n  }\n  const jobStatus = (j.status ?? '').toString().trim();\n  if (jobStatus !== 'IN_PROGRESS') {\n    return { json: { ...j, validationPass: 'FAIL', validationReason: 'not_clocked_in', validationMsg: 'No approved clock-in found for this booking. Please clock in first.' } };\n  }\n  const clockInTime = j.clockInTimeUTC ? new Date(j.clockInTimeUTC) : null;\n  const checkoutTime = j.submissionTimestamp ? new Date(j.submissionTimestamp) : null;\n  if (!clockInTime || isNaN(clockInTime.getTime()) || !checkoutTime || isNaN(checkoutTime.getTime())) {\n    return { json: { ...j, validationPass: 'FAIL', validationReason: 'invalid_timestamp', validationMsg: 'Invalid timestamp \\u2014 cannot calculate duration.' } };\n  }\n  const durationMin = Math.round((checkoutTime.getTime() - clockInTime.getTime()) / 60000);\n  if (durationMin < 30) {\n    return { json: { ...j, validationPass: 'FAIL', validationReason: 'too_soon', validationMsg: 'Checkout too soon (' + durationMin + ' min after clock-in). Minimum is 30 minutes.', durationMinutes: durationMin } };\n  }\n  if (durationMin > 360) {\n    const durationHrs = (durationMin / 60).toFixed(1);\n    return { json: { ...j, validationPass: 'FAIL', validationReason: 'too_late', validationMsg: 'Checkout too late (' + durationHrs + ' hrs after clock-in). Maximum is 6 hours.', durationMinutes: durationMin } };\n  }\n  return { json: { ...j, validationPass: 'PASS', validationReason: 'ok', validationMsg: 'Pre-GPS checks passed', durationMinutes: durationMin } };\n});"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000007",
+      "name": "Validate Pre-GPS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        0
+      ],
+      "notesInFlow": false,
+      "notes": "Checks: cleaner match, clock-in status IN_PROGRESS, duration 30minâ€“6hrs.\nAdds validationPass (PASS/FAIL) and validationMsg to each item."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "pre-gps-pass",
+              "leftValue": "={{ $json.validationPass }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000008",
+      "name": "Pre-GPS Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "notesInFlow": false,
+      "notes": "TRUE = cleaner/status/duration checks passed â†’ proceed to GPS.\nFALSE = failed â†’ reject with reason from validationMsg."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1292187736",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "processingStatus": "REJECTED",
+            "resultMessage": "={{ $json.validationMsg }}",
+            "processedAt": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsLat",
+              "displayName": "gpsLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsLng",
+              "displayName": "gpsLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "submissionTimestamp",
+              "displayName": "submissionTimestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processingStatus",
+              "displayName": "processingStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultMessage",
+              "displayName": "resultMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processedAt",
+              "displayName": "processedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000009",
+      "name": "Reject Pre-GPS",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1350,
+        250
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets processingStatus=REJECTED with the reason from validationMsg.\nCovers: wrong cleaner, no clock-in, too soon, too late."
+    },
+    {
+      "id": "7cbbc49f-f828-42cb-bcbf-d339958c0407",
+      "name": "Respond Pre-GPS Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1600,
+        250
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"rejected\",\n  \"reason\": \"{{ $('Validate Pre-GPS').item.json.validationReason }}\",\n  \"message\": \"{{ $('Validate Pre-GPS').item.json.validationMsg }}\",\n  \"bookingUid\": \"{{ $('Validate Pre-GPS').item.json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through TRUE-branch items so Merge Coords can reference them reliably.\nreturn $input.all();"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000010",
+      "name": "Pass Validated Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1350,
+        -100
+      ],
+      "notesInFlow": false,
+      "notes": "Stores items that passed pre-GPS validation for reference in Merge Coords.\nWhy: Get Property Coordinates replaces item data â€” we need to re-merge later."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "766791868",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "propertyUid",
+              "lookupValue": "={{ $json.propertyUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000011",
+      "name": "Get Property Coordinates",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1600,
+        -100
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Looks up latitude/longitude from the Properties tab by propertyUid.\nWhy: compare the cleaner's GPS against the property location for radius check.",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c7e2ad99-e1de-49b9-84e2-d4cc9fee664b",
+      "name": "Property Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1850,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "54a83efe-9b10-46f9-b450-76277f2c6d8a",
+              "leftValue": "={{ $json.latitude }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9909de29-98e1-427f-865b-0efdf972dfaf",
+      "name": "Respond Property Missing",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2100,
+        100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Property coordinates not configured. Please contact admin.\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine by position: validated submission (Pass Validated Items) with coords (Get Property Coordinates).\n// Explicitly keep submission's row_number so downstream CheckoutSubmissions updates target the right row.\nconst submissionItems = $('Pass Validated Items').all();\nconst coordsItems = $input.all();\nconst len = Math.min(submissionItems.length, coordsItems.length);\nif (len === 0) return [];\nconst out = [];\nfor (let i = 0; i < len; i++) {\n  const sub = submissionItems[i]?.json || {};\n  const coord = coordsItems[i]?.json || {};\n  out.push({ json: { ...sub, ...coord, row_number: sub.row_number } });\n}\nreturn out;"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000012",
+      "name": "Merge Coords with Submission",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        -200
+      ],
+      "notesInFlow": false,
+      "notes": "Re-merges the validated submission data with property coordinates by position.\nWhy: distance calculation needs both GPS points in one object."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Haversine distance in meters between cleaner GPS and property GPS.\nconst items = $input.all();\nconst R = 6371000;\nconst toRad = deg => deg * (Math.PI / 180);\nreturn items.map(item => {\n  const j = item.json || {};\n  const userLat = parseFloat(j.gpsLat);\n  const userLng = parseFloat(j.gpsLng);\n  const propertyLat = parseFloat(j.latitude);\n  const propertyLng = parseFloat(j.longitude);\n  let distance = NaN;\n  if (Number.isFinite(userLat) && Number.isFinite(userLng) && Number.isFinite(propertyLat) && Number.isFinite(propertyLng)) {\n    const dLat = toRad(propertyLat - userLat);\n    const dLng = toRad(propertyLng - userLng);\n    const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toRad(userLat))*Math.cos(toRad(propertyLat))*Math.sin(dLng/2)*Math.sin(dLng/2);\n    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n    distance = R * c;\n  }\n  return { json: { ...j, distance: Number.isFinite(distance) ? Math.round(distance) : 999999 } };\n});"
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000013",
+      "name": "Distance Calculation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2350,
+        -200
+      ],
+      "notesInFlow": false,
+      "notes": "Haversine formula: calculates meters between cleaner GPS and property GPS.\nAdds distance (rounded meters) to each item. Defaults to 999999 if coords invalid."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "inside-radius",
+              "leftValue": "={{ $json.distance }}",
+              "rightValue": 100,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000014",
+      "name": "Radius Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        -200
+      ],
+      "notesInFlow": false,
+      "notes": "TRUE = within 100m â†’ approve.\nFALSE = too far â†’ reject with distance."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1292187736",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "processingStatus": "REJECTED",
+            "resultMessage": "={{ 'Outside property radius (' + $json.distance + 'm away)' }}",
+            "processedAt": "={{ $now.toISO() }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsLat",
+              "displayName": "gpsLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsLng",
+              "displayName": "gpsLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "submissionTimestamp",
+              "displayName": "submissionTimestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processingStatus",
+              "displayName": "processingStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultMessage",
+              "displayName": "resultMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processedAt",
+              "displayName": "processedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000015",
+      "name": "Reject GPS Outside",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2850,
+        -50
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets processingStatus=REJECTED with distance in metres.\nCleaner can retry by submitting the form again."
+    },
+    {
+      "id": "6e962de1-ad9d-45f7-af5a-29890bf0112a",
+      "name": "Respond Outside Radius",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3100,
+        -50
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"rejected\",\n  \"reason\": \"outside_radius\",\n  \"message\": \"Your location is outside the allowed 100m radius. Please move closer to the property and try again.\",\n  \"bookingUid\": \"{{ $('Radius Check').item.json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1292187736",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "processingStatus": "APPROVED",
+            "resultMessage": "Checkout successful",
+            "processedAt": "={{ $now.toISO() }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsLat",
+              "displayName": "gpsLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsLng",
+              "displayName": "gpsLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "submissionTimestamp",
+              "displayName": "submissionTimestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processingStatus",
+              "displayName": "processingStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultMessage",
+              "displayName": "resultMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processedAt",
+              "displayName": "processedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000016",
+      "name": "Update CheckoutSubmissions APPROVED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2850,
+        -300
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets processingStatus=APPROVED and resultMessage in CheckoutSubmissions.\nWhy: marks this submission as validated and accepted."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "2047086003",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $('Radius Check').item.json.bookingUid }}",
+            "status": "COMPLETED",
+            "clockOut": "={{ $('Radius Check').item.json.submissionTimestamp }}",
+            "gpsStatus": "INSIDE_RADIUS",
+            "clockOutTimeUTC": "={{ $('Radius Check').item.json.submissionTimestamp }}",
+            "gpsClockOutLat": "={{ $('Radius Check').item.json.gpsLat }}",
+            "gpsClockOutLng": "={{ $('Radius Check').item.json.gpsLng }}"
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "cleaningJobId",
+              "displayName": "cleaningJobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningDate",
+              "displayName": "cleaningDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleaningTime",
+              "displayName": "cleaningTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "assignedCleaner",
+              "displayName": "assignedCleaner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockIn",
+              "displayName": "clockIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockOut",
+              "displayName": "clockOut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workedHours",
+              "displayName": "workedHours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "createdAtSystem",
+              "displayName": "createdAtSystem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cleanerId",
+              "displayName": "cleanerId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assignedAt",
+              "displayName": "assignedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notificationStatus",
+              "displayName": "notificationStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendarStatus",
+              "displayName": "calendarStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendarEventId",
+              "displayName": "calendarEventId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "calendarId",
+              "displayName": "calendarId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processingFlag",
+              "displayName": "processingFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockInTimeUTC",
+              "displayName": "clockInTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockInLat",
+              "displayName": "gpsClockInLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockInLng",
+              "displayName": "gpsClockInLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsStatus",
+              "displayName": "gpsStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lateFlag",
+              "displayName": "lateFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "checkoutTimeUTC",
+              "displayName": "checkoutTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "scheduledCleaningTimeUTC",
+              "displayName": "scheduledCleaningTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "adminCalendarEventId",
+              "displayName": "adminCalendarEventId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockInLink",
+              "displayName": "clockInLink",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clockOutLink",
+              "displayName": "clockOutLink",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "clockOutTimeUTC",
+              "displayName": "clockOutTimeUTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockOutLat",
+              "displayName": "gpsClockOutLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gpsClockOutLng",
+              "displayName": "gpsClockOutLng",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000017",
+      "name": "Update CleaningJobs COMPLETED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        3100,
+        -300
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets CleaningJobs status=COMPLETED and writes clockOutTimeUTC + GPS out fields.\nWhy: marks job done so Workflow 5 (payroll) can pick it up."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleaningStatus": "COMPLETED",
+            "row_number": 0
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleaningStatus",
+              "displayName": "cleaningStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-6789-abcd-000000000018",
+      "name": "Update Reservations COMPLETED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        3350,
+        -300
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Sets Reservations cleaningStatus=COMPLETED by bookingUid.\nWhy: external systems read cleaningStatus from Reservations tab."
+    },
+    {
+      "id": "683c24a2-5306-4ca0-b1e1-2b71a1ab458e",
+      "name": "Respond Approved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        4350,
+        -450
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"approved\",\n  \"message\": \"Checkout confirmed. Job marked complete.\",\n  \"bookingUid\": \"{{ $('Radius Check').item.json.bookingUid }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000021",
+      "name": "Is Maintenance?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4350,
+        -200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "maint-check",
+              "leftValue": "={{ $('Reject If Already Approved').first().json.issueReported }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000022",
+      "name": "Append Maintenance Ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4600,
+        -200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569911294",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticketId": "=MT-{{ $('Reject If Already Approved').first().json.bookingUid }}-{{ $now.toMillis() }}",
+            "bookingUid": "={{ $('Reject If Already Approved').first().json.bookingUid }}",
+            "propertyUid": "",
+            "cleanerId": "={{ $('Reject If Already Approved').first().json.cleanerIdFromForm }}",
+            "issueType": "={{ $('Reject If Already Approved').first().json.issueType }}",
+            "description": "={{ $('Reject If Already Approved').first().json.description }}",
+            "photoUrl": "={{ $('Reject If Already Approved').first().json.photoUrl }}",
+            "priority": "={{ $('Reject If Already Approved').first().json.priority }}",
+            "status": "OPEN",
+            "reportedAt": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ticketId",
+              "displayName": "ticketId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerId",
+              "displayName": "cleanerId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issueType",
+              "displayName": "issueType",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "photoUrl",
+              "displayName": "photoUrl",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reportedAt",
+              "displayName": "reportedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000023",
+      "name": "Parse Supply Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4350,
+        -50
+      ],
+      "parameters": {
+        "jsCode": "// Read from pre-insert node to get supply data (Insert output drops non-mapped fields)\nconst item = $('Reject If Already Approved').first().json;\nconst supplies = item.supplies || [];\nif (!Array.isArray(supplies) || supplies.length === 0) return [];\nreturn supplies.map(s => ({ json: {\n  bookingUid: item.bookingUid,\n  cleanerIdFromForm: item.cleanerIdFromForm,\n  propertyUid: '',\n  itemName: s.itemName,\n  quantityUsed: s.quantityUsed,\n  loggedAt: new Date().toISOString()\n} }));"
+      }
+    },
+    {
+      "id": "4w000001-0000-0000-0000-000000000024",
+      "name": "Append Supply Usage",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4600,
+        -50
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "469288724",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleanerIdFromForm": "={{ $json.cleanerIdFromForm }}",
+            "propertyUid": "={{ $json.propertyUid }}",
+            "itemName": "={{ $json.itemName }}",
+            "quantityUsed": "={{ $json.quantityUsed }}",
+            "loggedAt": "={{ $json.loggedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "bookingUid",
+              "displayName": "bookingUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cleanerIdFromForm",
+              "displayName": "cleanerIdFromForm",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propertyUid",
+              "displayName": "propertyUid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "itemName",
+              "displayName": "itemName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "quantityUsed",
+              "displayName": "quantityUsed",
+              "type": "number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "loggedAt",
+              "displayName": "loggedAt",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0b463f3e-cf4c-479b-a3b6-2d21344a5240",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2400,
+        -200
+      ],
+      "parameters": {
+        "content": "## Workflow 4W — Checkout Ingestion + Validation (Merged)\nWebhook: POST /webhook/checkout\n\nReplaces old 4W + 4B. Single sync request/response.\nResponse contract mirrors 3W:\n 200 approved | 200 duplicate | 400 error | 403 rejected (pre-GPS or radius) | 404 not found | 500 insert/property fail\nMaintenance + Supply logs fan out from Insert (logged regardless of GPS outcome).",
+        "height": 240,
+        "width": 520
+      }
+    },
+    {
+      "id": "86247ab5-a2f2-4488-b996-518792eb9668",
+      "name": "Get Cleaner Profile",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3600,
+        -300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1920390373",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "cleanerId",
+              "lookupValue": "={{ $('Radius Check').item.json.cleanerId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "3729cd5a-b405-428e-9915-5c0862c83bb7",
+      "name": "Send Cleaner Checkout Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3850,
+        -300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Checkout Confirmed — {{ $('Radius Check').item.json.propertyName }}",
+        "emailType": "text",
+        "message": "=Hi {{ $json.name || 'there' }},\n\nYour checkout has been successfully recorded.\n\nProperty: {{ $('Radius Check').item.json.propertyName }}\nBooking Reference: {{ $('Radius Check').item.json.bookingUid }}\nCheckout Time: {{ $('Radius Check').item.json.submissionTimestamp }}\n\nThe job is now marked as complete. Great work!\n\nThank you,",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "52fbdfb0-45ab-451b-a515-edbefa07a672",
+      "name": "Send Admin Checkout Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        4100,
+        -300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "sendTo": "usman2acountf@gmail.com",
+        "subject": "=Job Completed — {{ $('Radius Check').item.json.propertyName }}",
+        "emailType": "text",
+        "message": "=A cleaning job has been completed.\n\nProperty:  {{ $('Radius Check').item.json.propertyName }}\nBooking:   {{ $('Radius Check').item.json.bookingUid }}\nCleaner:   {{ $('Radius Check').item.json.assignedCleaner }}\nCheckout:  {{ $('Radius Check').item.json.submissionTimestamp }}\nDuration:  {{ $('Radius Check').item.json.durationMinutes }} minutes\nGPS Status: Inside allowed radius\n\nMaintenance issue reported: {{ $('Radius Check').item.json.issueReported || 'No' }}\n\nThis is an automated notification.",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "9f8d4b7b-ddc0-46e8-a655-12bd20757b93",
+      "name": "Get Cleaner Profile (Rejected)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1600,
+        420
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1920390373",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "cleanerId",
+              "lookupValue": "={{ $json.cleanerId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "97365973-8f3b-47cc-b413-756e3065cd3d",
+      "name": "Send Cleaner Pre-GPS Reject Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1850,
+        420
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Checkout Could Not Be Completed — {{ $('Merge Submission and Job').item.json.propertyName }}",
+        "emailType": "text",
+        "message": "=Hi {{ $json.name || 'there' }},\n\nYour checkout submission could not be processed.\n\nReason: {{ $('Reject Pre-GPS').item.json.validationMsg }}\n\nProperty: {{ $('Merge Submission and Job').item.json.propertyName }}\nBooking Reference: {{ $('Merge Submission and Job').item.json.bookingUid }}\n\nPlease contact your manager if you need assistance.\n\nThank you,",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "163ae356-dc0d-4c8c-9643-836a523f2131",
+      "name": "Get Cleaner Profile (Outside)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3100,
+        100
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1920390373",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "cleanerId",
+              "lookupValue": "={{ $json.cleanerId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "0f37d11d-eb4d-42b0-b90d-1d84078bc2d4",
+      "name": "Send Cleaner Outside Radius Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3350,
+        100
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Checkout Rejected — Location Outside Allowed Radius",
+        "emailType": "text",
+        "message": "=Hi {{ $json.name || 'there' }},\n\nYour checkout could not be accepted because your location was detected outside the allowed distance from the property.\n\nProperty: {{ $('Radius Check').item.json.propertyName }}\nBooking Reference: {{ $('Radius Check').item.json.bookingUid }}\nDetected Distance: {{ $('Radius Check').item.json.distance }} metres\n\nPlease move closer to the property and try again. If you believe this is an error, contact your manager.\n\nThank you,",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Check": {
+      "main": [
+        [
+          {
+            "node": "ParseAndValidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseAndValidate": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Existing Checkout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Existing Checkout": {
+      "main": [
+        [
+          {
+            "node": "Reject If Already Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject If Already Approved": {
+      "main": [
+        [
+          {
+            "node": "Should Insert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Insert?": {
+      "main": [
+        [
+          {
+            "node": "Insert into CheckoutSubmissions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into CheckoutSubmissions": {
+      "main": [
+        [
+          {
+            "node": "Lookup Inserted Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Maintenance?": {
+      "main": [
+        [
+          {
+            "node": "Append Maintenance Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Supply Items": {
+      "main": [
+        [
+          {
+            "node": "Append Supply Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Inserted Row": {
+      "main": [
+        [
+          {
+            "node": "Inserted Row Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserted Row Found?": {
+      "main": [
+        [
+          {
+            "node": "Get Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Insert Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Booking": {
+      "main": [
+        [
+          {
+            "node": "Booking Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Found?": {
+      "main": [
+        [
+          {
+            "node": "Merge Submission and Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Booking Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Submission and Job": {
+      "main": [
+        [
+          {
+            "node": "Validate Pre-GPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Pre-GPS": {
+      "main": [
+        [
+          {
+            "node": "Pre-GPS Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-GPS Check": {
+      "main": [
+        [
+          {
+            "node": "Pass Validated Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Pre-GPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Pre-GPS": {
+      "main": [
+        [
+          {
+            "node": "Get Cleaner Profile (Rejected)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass Validated Items": {
+      "main": [
+        [
+          {
+            "node": "Get Property Coordinates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Property Coordinates": {
+      "main": [
+        [
+          {
+            "node": "Property Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Property Found?": {
+      "main": [
+        [
+          {
+            "node": "Merge Coords with Submission",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Property Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Coords with Submission": {
+      "main": [
+        [
+          {
+            "node": "Distance Calculation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distance Calculation": {
+      "main": [
+        [
+          {
+            "node": "Radius Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Radius Check": {
+      "main": [
+        [
+          {
+            "node": "Update CheckoutSubmissions APPROVED",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject GPS Outside",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject GPS Outside": {
+      "main": [
+        [
+          {
+            "node": "Get Cleaner Profile (Outside)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CheckoutSubmissions APPROVED": {
+      "main": [
+        [
+          {
+            "node": "Update CleaningJobs COMPLETED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CleaningJobs COMPLETED": {
+      "main": [
+        [
+          {
+            "node": "Update Reservations COMPLETED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reservations COMPLETED": {
+      "main": [
+        [
+          {
+            "node": "Get Cleaner Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cleaner Profile": {
+      "main": [
+        [
+          {
+            "node": "Send Cleaner Checkout Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Cleaner Checkout Email": {
+      "main": [
+        [
+          {
+            "node": "Send Admin Checkout Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Admin Checkout Email": {
+      "main": [
+        [
+          {
+            "node": "Respond Approved",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Maintenance?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Supply Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cleaner Profile (Rejected)": {
+      "main": [
+        [
+          {
+            "node": "Send Cleaner Pre-GPS Reject Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Cleaner Pre-GPS Reject Email": {
+      "main": [
+        [
+          {
+            "node": "Respond Pre-GPS Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cleaner Profile (Outside)": {
+      "main": [
+        [
+          {
+            "node": "Send Cleaner Outside Radius Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Cleaner Outside Radius Email": {
+      "main": [
+        [
+          {
+            "node": "Respond Outside Radius",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
