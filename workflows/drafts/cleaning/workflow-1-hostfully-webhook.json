@@ -101,6 +101,19 @@
       }
     },
     {
+      "id": "fa91c3d2-0b7e-4e88-b2c9-8e1d5f6a3c47",
+      "name": "Unwrap Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Hostfully API wraps response: { \"lead\": { uid, status, ... } }\n// Flatten so all downstream nodes see $json.uid, $json.status etc. directly\nconst raw = $input.first().json;\nif (!raw.lead) throw new Error('Hostfully response missing \"lead\" key: ' + JSON.stringify(raw));\nreturn [{ json: raw.lead }];"
+      }
+    },
+    {
       "id": "b3a5e339-809b-4086-95b4-b7fd8622712b",
       "name": "Route on Event Type",
       "type": "n8n-nodes-base.switch",
@@ -183,7 +196,6 @@
         }
       },
       "parameters": {
-        "operation": "lookupRows",
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
@@ -295,7 +307,7 @@
         -60
       ],
       "parameters": {
-        "jsCode": "// Read directly from the fetched lead\nconst ZONED_REGEX = /[zZ]|[+-]\\d{2}:\\d{2}$/;\nconst lead = $('Fetch Lead by UID').first().json;\n\nconst bookingUid   = lead?.uid || '';\nconst cleaningJobId = bookingUid ? bookingUid + '_CLEAN' : '';\nconst rawCheckout  = lead?.checkOutZonedDateTime;\nif (!rawCheckout || typeof rawCheckout !== 'string' || rawCheckout.trim() === '')\n  throw new Error('Missing checkOutZonedDateTime from Hostfully lead');\nconst s = rawCheckout.trim();\nif (!ZONED_REGEX.test(s))\n  throw new Error('Invalid checkout time: timezone offset or Z required');\nconst checkoutDate = new Date(s);\nif (isNaN(checkoutDate.getTime()))\n  throw new Error('Cannot parse checkout time: ' + s);\nconst checkoutTimeUTC          = checkoutDate.toISOString();\nconst scheduledCleaningTimeUTC = checkoutTimeUTC;\nconst localDT      = (lead.checkOutLocalDateTime || '').trim();\nconst cleaningDate = localDT.substring(0, 10);\nconst cleaningTime = localDT.substring(11, 16);\n\nreturn [{ json: {\n  cleaningJobId,\n  bookingUid,\n  propertyUid:             lead.propertyUid || '',\n  cleaningDate,\n  cleaningTime,\n  checkoutTimeUTC,\n  scheduledCleaningTimeUTC,\n  createdAtSystem: new Date().toISOString()\n} }];"
+        "jsCode": "// Read directly from the fetched (unwrapped) lead\nconst ZONED_REGEX = /[zZ]|[+-]\\d{2}:\\d{2}$/;\nconst lead = $('Unwrap Lead').first().json;\n\nconst bookingUid   = lead?.uid || '';\nconst cleaningJobId = bookingUid ? bookingUid + '_CLEAN' : '';\nconst rawCheckout  = lead?.checkOutZonedDateTime;\nif (!rawCheckout || typeof rawCheckout !== 'string' || rawCheckout.trim() === '')\n  throw new Error('Missing checkOutZonedDateTime from Hostfully lead');\nconst s = rawCheckout.trim();\nif (!ZONED_REGEX.test(s))\n  throw new Error('Invalid checkout time: timezone offset or Z required');\nconst checkoutDate = new Date(s);\nif (isNaN(checkoutDate.getTime()))\n  throw new Error('Cannot parse checkout time: ' + s);\nconst checkoutTimeUTC          = checkoutDate.toISOString();\nconst scheduledCleaningTimeUTC = checkoutTimeUTC;\nconst localDT      = (lead.checkOutLocalDateTime || '').trim();\nconst cleaningDate = localDT.substring(0, 10);\nconst cleaningTime = localDT.substring(11, 16);\n\nreturn [{ json: {\n  cleaningJobId,\n  bookingUid,\n  propertyUid:             lead.propertyUid || '',\n  cleaningDate,\n  cleaningTime,\n  checkoutTimeUTC,\n  scheduledCleaningTimeUTC,\n  createdAtSystem: new Date().toISOString()\n} }];"
       }
     },
     {
@@ -433,7 +445,6 @@
         }
       },
       "parameters": {
-        "operation": "lookupRows",
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
@@ -465,7 +476,7 @@
         340
       ],
       "parameters": {
-        "jsCode": "// Single-event version — skip if no reservation or already cancelled\nconst lookup = $input.first().json;\nconst lead   = $('Fetch Lead by UID').first().json;\n\n// No reservation row — nothing to cancel\nif (lookup._noMatch) return [];\n\n// Already cancelled — idempotent, skip\nconst status = (lookup.cleaningStatus ?? '').toString().trim().toUpperCase();\nif (status === 'CANCELLED') return [];\n\nreturn [{ json: lead }];"
+        "jsCode": "// Single-event version — skip if no reservation or already cancelled\nconst lookup = $input.first().json;\nconst lead   = $('Unwrap Lead').first().json;\n\n// No reservation row — nothing to cancel\nif (lookup._noMatch) return [];\n\n// Already cancelled — idempotent, skip\nconst status = (lookup.cleaningStatus ?? '').toString().trim().toUpperCase();\nif (status === 'CANCELLED') return [];\n\nreturn [{ json: lead }];"
       }
     },
     {
@@ -526,7 +537,6 @@
         }
       },
       "parameters": {
-        "operation": "lookupRows",
         "documentId": {
           "__rl": true,
           "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
@@ -646,6 +656,17 @@
       ]
     },
     "Fetch Lead by UID": {
+      "main": [
+        [
+          {
+            "node": "Unwrap Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unwrap Lead": {
       "main": [
         [
           {
