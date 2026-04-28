@@ -223,7 +223,8 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `7X0QKeFueWTdz0GW` | Workflow 5 – Payroll Processing | Schedule (daily 02:00 UTC) | Active |
 | `BQ6uHsWxBcegrfrv` | cancellationHandler | Webhook POST `/webhook/cancellation-handler` | Active |
 | `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | Webhook POST `/webhook/extended-checkout-handler` | Active |
-| `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync | Schedule (every 1 min) | Active (Phase 2 target: replace with webhook) |
+| `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync (OLD poller) | Schedule (every 1 min) | Active — deactivate after new WF 1 confirmed in prod |
+| `DnVBNO7uxLSrXNYe` | Workflow 1 — Hostfully Booking Ingest (Webhook) | Webhook POST `/webhook/hostfully-booking-event` | **Inactive draft — activate to replace old poller** |
 
 ### Deactivated / Rollback Only (do not reactivate)
 

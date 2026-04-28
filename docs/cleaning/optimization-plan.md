@@ -216,56 +216,78 @@ Should list both.
 DELETE https://api.hostfully.com/api/v3/webhooks/<webhookUid>
 ```
 
-________________________
-this is the webhook payload for BookingUpdatedHook
+### Hostfully webhook payload (thin — always fetch full lead)
+
+```json
 {
-  "agency_uid":"1293fab6-71ba-4317-a3c0-be3365180c7b",
-  "event_type":"BOOKING_UPDATED",
-  "lead_uid":"ce0668b5-7abd-4928-8dba-113d687dac58",
+  "agency_uid":  "1293fab6-71ba-4317-a3c0-be3365180c7b",
+  "event_type":  "BOOKING_UPDATED",
+  "lead_uid":    "ce0668b5-7abd-4928-8dba-113d687dac58",
   "property_uid":"906738ca-aacb-4e86-be5f-9e7616507c12"
 }
-so when we recive a webhook we have to call the api again we dont reveive the full payload
-1-we have to filter by agency_uid to confirm we are receiving lead for our agency 
-2-we have to map thorugh event_type 
-3- then we have to call api through lead_uid
+```
 
+Hostfully sends only these 4 fields. Full booking data must be fetched separately:
+`GET https://platform.hostfully.com/api/v3/leads/{lead_uid}?agencyUid={agencyUid}`
 
+Processing order:
+1. Verify `agency_uid` matches our agency — drop events from other agencies
+2. Route on `event_type`
+3. Fetch full lead from Hostfully API using `lead_uid`
 
+### New Workflow 1 shape (webhook-driven, implemented)
 
-__________________________
-
-### New Workflow 1 shape (webhook-driven)
+**n8n workflow ID:** `DnVBNO7uxLSrXNYe` (inactive draft — activate after testing)
 
 ```
 Webhook POST /webhook/hostfully-booking-event
    ↓
 Respond 200 immediately (Hostfully retries on non-2xx)
    ↓
-Switch on $json.body.eventType
-   ├─ NEW_BOOKING → Fetch lead by leadUid (Hostfully API)
-   │               → Normalize fields
-   │               → Lookup Reservations (dup check by bookingUid)
-   │               → if new: append Reservations + CleaningJobs (status PENDING)
+Agency Check (drop if agency_uid doesn't match)
+   ↓
+Fetch Lead by UID → GET /api/v3/leads/{lead_uid}
+   ↓
+Route on Event Type (Switch)
+   ├─ NEW_BOOKING:
+   │   Lookup Reservation (dup check by uid)
+   │   → Reservation Exists? (IF)
+   │      → NO: Create Reservation Record
+   │             → Prepare Cleaning Job Data
+   │             → Create Cleaning Job Record
+   │             → Update Reservation with Cleaning Job ID
+   │      → YES: no-op (already in sheet)
    │
-   ├─ BOOKING_UPDATED → Fetch lead by leadUid
-   │                  → Switch on status:
-   │                     ├─ CANCELLED → POST to /webhook/cancellation-handler
-   │                     ├─ BOOKED + checkOut changed later → POST to /webhook/extended-checkout-handler
-   │                     └─ else → ignore (no-op)
-   │
-   └─ other → log + ignore
+   └─ BOOKING_UPDATED:
+       Is Cancelled? (IF lead.status === 'CANCELLED')
+         → YES: Lookup Reservation for Cancellation
+                → Cancellation Idempotency Guard
+                → POST /webhook/cancellation-handler
+         → NO (BOOKED): Prepare Extended Checkout Candidate
+                         → Lookup Reservation for Candidate
+                         → Reservation Exists Guard (newCheckOut > stored?)
+                         → POST /webhook/extended-checkout-handler
 ```
+
+**What was removed vs old polling WF:** Schedule trigger, Read Last Timestamp, Initialize Cursor,
+two paginated Fetch Leads HTTP nodes, Has More Pages loop, Accumulate Leads, Split In Batches,
+Output Leads Individually, Compute Max After Loop, Update Stored Timestamp, Filter New Bookings,
+Detect Extended Checkouts, Detect Cancellations, Split Extended Candidates,
+Merge Lead and Lookup, Ensure One Item — **17 nodes eliminated**.
+
+**What changed in kept nodes:**
+- All three Lookup Reservation nodes: `mode:"name"` → `mode:"id"` with numeric gid `569949670`
+- `Prepare Cleaning Job Data`: reads from `Fetch Lead by UID` (removed `Merge Lead and Lookup` ref)
+- `Reservation Exists Guard`: simplified from batch-loop to single-event comparison
+- `Cancellation Idempotency Guard`: simplified from batch-loop to single-event check
+- Trigger URLs: `localhost:5678` → `https://n8n.srv1566844.hstgr.cloud`
 
 ### Why keep cancellationHandler and 1A separate
 
-Initially I considered merging both into the new WF 1. Rejected because:
-- cancellationHandler has 20 nodes (calendar delete, cleaner email, 2-path switch)
-- 1A has 17 nodes (calendar reschedule, cleaner email, 2-path switch)
-- Merging yields a 60+ node workflow that would be painful to debug
-- Keeping them separate means the webhook-router WF 1 stays ~15 nodes and each handler owns one concern
-- No performance cost: internal n8n-to-n8n webhook call is a few ms
-
-Both stay as today; WF 1 just becomes the dispatcher rather than the poller.
+Both stay as today — WF 1 just becomes the dispatcher rather than the poller.
+- cancellationHandler: calendar delete, cleaner email, 2-path switch
+- 1A: calendar reschedule, cleaner email, 2-path switch
+- Merging would yield 60+ node workflow; internal webhook call costs only a few ms
 
 ### Auth on the inbound webhook
 
@@ -277,21 +299,22 @@ You're going to research the auth side yourself — the research question is: **
 
 ### Migration cutover
 
-1. Build new WF 1 in drafts, inactive.
-2. Register Hostfully webhooks pointing to it.
-3. Turn on new WF 1.
-4. Leave old polling WF 1 running in parallel for 24 hours — dup check prevents double-insert.
+~~1. Build new WF 1 in drafts, inactive.~~ ✅ Done — ID `DnVBNO7uxLSrXNYe`
+~~2. Register Hostfully webhooks pointing to it.~~ ✅ Done — `NEW_BOOKING` + `BOOKING_UPDATED` registered
+3. **Activate new WF 1** (`DnVBNO7uxLSrXNYe`) in n8n.
+4. Leave old polling WF 1 (`JKS8Imjt5Nvp1ReG`) running in parallel for 24 hours — dup check prevents double-insert.
 5. Confirm new WF 1 caught at least one NEW_BOOKING and one BOOKING_UPDATED in production.
-6. Deactivate old polling WF 1.
+6. Deactivate old polling WF 1 (`JKS8Imjt5Nvp1ReG`).
 7. After 1 week clean: delete old polling WF 1.
 
 ### Test plan (Phase 2)
 
-- [ ] Register webhooks, verify GET returns both
-- [ ] Book a test reservation in Hostfully → NEW_BOOKING webhook fires → WF 1 creates rows
-- [ ] Extend checkout on existing booking → BOOKING_UPDATED fires → 1A handler called → cleaner rescheduled
-- [ ] Cancel a booking → BOOKING_UPDATED with status=CANCELLED → cancellationHandler called
-- [ ] Edit guest note only → BOOKING_UPDATED fires, routing ignores (no-op) — critical to verify, false positives cause duplicate work
+- [x] Register webhooks — `NEW_BOOKING` + `BOOKING_UPDATED` registered pointing to `/webhook/hostfully-booking-event`
+- [ ] Activate new WF 1 and verify webhook path is live
+- [ ] Book a test reservation in Hostfully → NEW_BOOKING fires → Reservations + CleaningJobs rows created
+- [ ] Extend checkout on existing booking → BOOKING_UPDATED fires → 1A handler triggered → cleaner rescheduled
+- [ ] Cancel a booking → BOOKING_UPDATED with status=CANCELLED → cancellationHandler triggered
+- [ ] Edit guest note only → BOOKING_UPDATED fires, routing ignores (no-op) — critical: false positives cause duplicate work
 - [ ] Measure: NEW_BOOKING → Reservations row in <5s
 
 ### Risk & rollback

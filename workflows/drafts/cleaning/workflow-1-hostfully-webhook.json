@@ -1,0 +1,813 @@
+{
+  "name": "Workflow 1 — Hostfully Booking Ingest (Webhook)",
+  "nodes": [
+    {
+      "id": "4ca17bac-895e-40d3-8f58-61d464c31953",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "hf-booking-event-v2",
+      "parameters": {
+        "path": "hostfully-booking-event",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "b2435b8b-dd9e-4216-825d-3ea87d24db28",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        280,
+        200
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"received\":true}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "e73ce5c4-601f-42d7-87b8-8503272359d8",
+      "name": "Agency Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        560,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "agency-uid-check",
+              "leftValue": "={{ $json.body.agency_uid }}",
+              "rightValue": "35842d2f-b5c1-46fa-a33d-a12756b42ed8",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "33c7b1a7-a82a-4e46-afcb-166bce15ace6",
+      "name": "Fetch Lead by UID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9KxNwfaP8qRHdRPm",
+          "name": "Hostfully API"
+        }
+      },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://platform.hostfully.com/api/v3/leads/{{ $json.body.lead_uid }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "agencyUid",
+              "value": "35842d2f-b5c1-46fa-a33d-a12756b42ed8"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3a5e339-809b-4086-95b4-b7fd8622712b",
+      "name": "Route on Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        200
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-new",
+                    "leftValue": "={{ $('Webhook').first().json.body.event_type }}",
+                    "rightValue": "NEW_BOOKING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "NEW_BOOKING"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-updated",
+                    "leftValue": "={{ $('Webhook').first().json.body.event_type }}",
+                    "rightValue": "BOOKING_UPDATED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "BOOKING_UPDATED"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8dbff620-7d77-4556-bd79-76e3bde25126",
+      "name": "Lookup Reservation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1400,
+        -60
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "lookupRows",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.uid }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0d9ea0af-0b02-44df-8cd5-06231a5650c4",
+      "name": "Reservation Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "if-reservation-exists",
+              "leftValue": "={{ $json._noMatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f9109227-913a-4650-bcd5-06574ffaebd8",
+      "name": "Create Reservation Record",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1960,
+        -60
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.uid }}",
+            "propertyUid": "={{ $json.propertyUid }}",
+            "guestName": "={{ ($json.guestInformation?.firstName || '') + ' ' + ($json.guestInformation?.lastName || '') }}",
+            "checkIn": "={{ $json.checkInLocalDateTime }}",
+            "checkOut": "={{ $json.checkOutLocalDateTime }}",
+            "adultCount": "={{ $json.guestInformation?.adultCount ?? '' }}",
+            "source": "={{ $json.channel }}",
+            "createdUtc": "={{ $json.metadata?.createdUtcDateTime }}",
+            "cleaningStatus": "PENDING",
+            "maintenanceStatus": "NONE",
+            "payrollStatus": "NOT_STARTED",
+            "createdAtSystem": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c8a88eca-22fe-4acb-85a8-ddd543842fc0",
+      "name": "Prepare Cleaning Job Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -60
+      ],
+      "parameters": {
+        "jsCode": "// Read directly from the fetched lead\nconst ZONED_REGEX = /[zZ]|[+-]\\d{2}:\\d{2}$/;\nconst lead = $('Fetch Lead by UID').first().json;\n\nconst bookingUid   = lead?.uid || '';\nconst cleaningJobId = bookingUid ? bookingUid + '_CLEAN' : '';\nconst rawCheckout  = lead?.checkOutZonedDateTime;\nif (!rawCheckout || typeof rawCheckout !== 'string' || rawCheckout.trim() === '')\n  throw new Error('Missing checkOutZonedDateTime from Hostfully lead');\nconst s = rawCheckout.trim();\nif (!ZONED_REGEX.test(s))\n  throw new Error('Invalid checkout time: timezone offset or Z required');\nconst checkoutDate = new Date(s);\nif (isNaN(checkoutDate.getTime()))\n  throw new Error('Cannot parse checkout time: ' + s);\nconst checkoutTimeUTC          = checkoutDate.toISOString();\nconst scheduledCleaningTimeUTC = checkoutTimeUTC;\nconst localDT      = (lead.checkOutLocalDateTime || '').trim();\nconst cleaningDate = localDT.substring(0, 10);\nconst cleaningTime = localDT.substring(11, 16);\n\nreturn [{ json: {\n  cleaningJobId,\n  bookingUid,\n  propertyUid:             lead.propertyUid || '',\n  cleaningDate,\n  cleaningTime,\n  checkoutTimeUTC,\n  scheduledCleaningTimeUTC,\n  createdAtSystem: new Date().toISOString()\n} }];"
+      }
+    },
+    {
+      "id": "c02afcff-de56-4143-a67a-fa15b75c9f01",
+      "name": "Create Cleaning Job Record",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2520,
+        -60
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "2047086003",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "cleaningJobId": "={{ $json.cleaningJobId }}",
+            "bookingUid": "={{ $json.bookingUid }}",
+            "propertyUid": "={{ $json.propertyUid }}",
+            "cleaningDate": "={{ $json.cleaningDate }}",
+            "cleaningTime": "={{ $json.cleaningTime }}",
+            "checkoutTimeUTC": "={{ $json.checkoutTimeUTC }}",
+            "scheduledCleaningTimeUTC": "={{ $json.scheduledCleaningTimeUTC }}",
+            "status": "PENDING",
+            "createdAtSystem": "={{ $json.createdAtSystem }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "604d998a-c0be-422f-9036-dbd9bd75bace",
+      "name": "Update Reservation with Cleaning Job ID",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2800,
+        -60
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bookingUid": "={{ $json.bookingUid }}",
+            "cleaningJobId": "={{ $json.cleaningJobId }}"
+          },
+          "matchingColumns": [
+            "bookingUid"
+          ],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c6570b-5555-4148-8445-9d2d4b5f2c98",
+      "name": "Is Cancelled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-cancelled-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "CANCELLED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "32f69ee5-6bce-49e7-a8db-4d4ae78daa8c",
+      "name": "Lookup Reservation for Cancellation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        340
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "lookupRows",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.uid }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "38f8b16a-7d14-4451-8455-2be0c1de7914",
+      "name": "Cancellation Idempotency Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        340
+      ],
+      "parameters": {
+        "jsCode": "// Single-event version — skip if no reservation or already cancelled\nconst lookup = $input.first().json;\nconst lead   = $('Fetch Lead by UID').first().json;\n\n// No reservation row — nothing to cancel\nif (lookup._noMatch) return [];\n\n// Already cancelled — idempotent, skip\nconst status = (lookup.cleaningStatus ?? '').toString().trim().toUpperCase();\nif (status === 'CANCELLED') return [];\n\nreturn [{ json: lead }];"
+      }
+    },
+    {
+      "id": "9d4705a2-5a09-448e-a12c-c2998e6bf2eb",
+      "name": "Trigger Cancellation Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        340
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1566844.hstgr.cloud/webhook/cancellation-handler",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "bookingUid",
+              "value": "={{ $json.uid }}"
+            },
+            {
+              "name": "propertyUid",
+              "value": "={{ $json.propertyUid }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a5e82b02-f602-41d3-8f0c-6acd33bfde06",
+      "name": "Prepare Extended Checkout Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        580
+      ],
+      "parameters": {
+        "jsCode": "// Extract extended-checkout candidate fields from the fetched lead\nconst ZONED_REGEX = /[zZ]|[+-]\\d{2}:\\d{2}$/;\nconst lead = $input.first().json;\n\n// Only BOOKED leads qualify for extended checkout\nif (lead.type !== 'BOOKING' || lead.status !== 'BOOKED') return [];\n\nconst rawZoned = lead.checkOutZonedDateTime;\nif (!rawZoned || !ZONED_REGEX.test(rawZoned.trim())) return [];\nconst checkoutDate = new Date(rawZoned.trim());\nif (isNaN(checkoutDate.getTime())) return [];\n\nconst checkoutTimeUTC = checkoutDate.toISOString();\nconst localDT         = (lead.checkOutLocalDateTime || '').trim();\n\nreturn [{ json: {\n  bookingUid:                   lead.uid || '',\n  propertyUid:                  lead.propertyUid || '',\n  newCheckOut:                  localDT,\n  newCheckoutTimeUTC:           checkoutTimeUTC,\n  newScheduledCleaningTimeUTC:  checkoutTimeUTC,\n  newCleaningDate:              localDT.substring(0, 10),\n  newCleaningTime:              localDT.substring(11, 16)\n} }];"
+      }
+    },
+    {
+      "id": "3b514b50-36e8-4b67-90d6-e6db9cd7fef6",
+      "name": "Lookup Reservation for Candidate",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1960,
+        580
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "lookupRows",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "569949670",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "bookingUid",
+              "lookupValue": "={{ $json.bookingUid }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "42b3307a-1b24-495c-8f8a-1a4c4aa03799",
+      "name": "Reservation Exists Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        580
+      ],
+      "parameters": {
+        "jsCode": "// Single-event version: pass through only if checkout is genuinely later\nconst lookup    = $input.first().json;\nconst candidate = $('Prepare Extended Checkout Candidate').first().json;\n\n// No reservation in sheet — nothing to extend\nif (lookup._noMatch) return [];\n\n// Normalise both to ISO-like strings for safe string comparison\nconst sheetCO = (lookup.checkOut ?? '').toString().trim().replace(' ', 'T');\nconst newCO   = (candidate.newCheckOut ?? '').toString().trim().replace(' ', 'T');\n\n// Only proceed if new checkout is strictly later than stored\nif (!newCO || newCO <= sheetCO) return [];\n\nreturn [{ json: candidate }];"
+      }
+    },
+    {
+      "id": "1eb255e0-3e50-4932-9a60-e747f403b345",
+      "name": "Trigger Extended Checkout Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2520,
+        580
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1566844.hstgr.cloud/webhook/extended-checkout-handler",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "bookingUid",
+              "value": "={{ $json.bookingUid }}"
+            },
+            {
+              "name": "propertyUid",
+              "value": "={{ $json.propertyUid }}"
+            },
+            {
+              "name": "newCheckOut",
+              "value": "={{ $json.newCheckOut }}"
+            },
+            {
+              "name": "newCheckoutTimeUTC",
+              "value": "={{ $json.newCheckoutTimeUTC }}"
+            },
+            {
+              "name": "newScheduledCleaningTimeUTC",
+              "value": "={{ $json.newScheduledCleaningTimeUTC }}"
+            },
+            {
+              "name": "newCleaningDate",
+              "value": "={{ $json.newCleaningDate }}"
+            },
+            {
+              "name": "newCleaningTime",
+              "value": "={{ $json.newCleaningTime }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Agency Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agency Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead by UID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Fetch Lead by UID": {
+      "main": [
+        [
+          {
+            "node": "Route on Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route on Event Type": {
+      "main": [
+        [
+          {
+            "node": "Lookup Reservation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Cancelled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Reservation": {
+      "main": [
+        [
+          {
+            "node": "Reservation Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservation Exists?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Create Reservation Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Reservation Record": {
+      "main": [
+        [
+          {
+            "node": "Prepare Cleaning Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Cleaning Job Data": {
+      "main": [
+        [
+          {
+            "node": "Create Cleaning Job Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Cleaning Job Record": {
+      "main": [
+        [
+          {
+            "node": "Update Reservation with Cleaning Job ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Cancelled?": {
+      "main": [
+        [
+          {
+            "node": "Lookup Reservation for Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Extended Checkout Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Reservation for Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Cancellation Idempotency Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancellation Idempotency Guard": {
+      "main": [
+        [
+          {
+            "node": "Trigger Cancellation Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Extended Checkout Candidate": {
+      "main": [
+        [
+          {
+            "node": "Lookup Reservation for Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Reservation for Candidate": {
+      "main": [
+        [
+          {
+            "node": "Reservation Exists Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservation Exists Guard": {
+      "main": [
+        [
+          {
+            "node": "Trigger Extended Checkout Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": ""
+  },
+  "active": false
+}
