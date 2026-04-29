@@ -167,9 +167,18 @@
                       "type": "string",
                       "operation": "equals"
                     }
+                  },
+                  {
+                    "id": "route-cancelled",
+                    "leftValue": "={{ $('Webhook').first().json.body.event_type }}",
+                    "rightValue": "BOOKING_CANCELLED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
                   }
                 ],
-                "combinator": "and"
+                "combinator": "or"
               },
               "renameOutput": true,
               "outputKey": "BOOKING_UPDATED"
