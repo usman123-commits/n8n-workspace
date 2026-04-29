@@ -485,7 +485,7 @@
         340
       ],
       "parameters": {
-        "jsCode": "// Single-event version — skip if no reservation or already cancelled\nconst lookup = $input.first().json;\nconst lead   = $('Unwrap Lead').first().json;\n\n// No reservation row — nothing to cancel\nif (lookup._noMatch) return [];\n\n// Already cancelled — idempotent, skip\nconst status = (lookup.cleaningStatus ?? '').toString().trim().toUpperCase();\nif (status === 'CANCELLED') return [];\n\nreturn [{ json: lead }];"
+        "jsCode": "// Single-event version — skip if no reservation or already cancelled\nconst lookup = $input.first().json;\nconst lead   = $('Unwrap Lead').first().json;\n\n// No reservation row — nothing to cancel\n// Guard against both _noMatch:true and empty {} (n8n returns {} when alwaysOutputData:true and no row found)\nif (lookup._noMatch || !lookup.bookingUid) return [];\n\n// Already cancelled — idempotent, skip\nconst status = (lookup.cleaningStatus ?? '').toString().trim().toUpperCase();\nif (status === 'CANCELLED') return [];\n\nreturn [{ json: lead }];"
       }
     },
     {
@@ -577,7 +577,7 @@
         580
       ],
       "parameters": {
-        "jsCode": "// Single-event version: pass through only if checkout is genuinely later\nconst lookup    = $input.first().json;\nconst candidate = $('Prepare Extended Checkout Candidate').first().json;\n\n// No reservation in sheet — nothing to extend\nif (lookup._noMatch) return [];\n\n// Normalise both to ISO-like strings for safe string comparison\nconst sheetCO = (lookup.checkOut ?? '').toString().trim().replace(' ', 'T');\nconst newCO   = (candidate.newCheckOut ?? '').toString().trim().replace(' ', 'T');\n\n// Only proceed if new checkout is strictly later than stored\nif (!newCO || newCO <= sheetCO) return [];\n\nreturn [{ json: candidate }];"
+        "jsCode": "// Single-event version: pass through only if checkout is genuinely later\nconst lookup    = $input.first().json;\nconst candidate = $('Prepare Extended Checkout Candidate').first().json;\n\n// No reservation in sheet — nothing to extend\n// Guard against both _noMatch:true and empty {} (n8n returns {} when alwaysOutputData:true and no row found)\nif (lookup._noMatch || !lookup.bookingUid) return [];\n\n// Normalise both to ISO-like strings for safe string comparison\nconst sheetCO = (lookup.checkOut ?? '').toString().trim().replace(' ', 'T');\nconst newCO   = (candidate.newCheckOut ?? '').toString().trim().replace(' ', 'T');\n\n// Only proceed if new checkout is strictly later than stored\nif (!sheetCO || !newCO || newCO <= sheetCO) return [];\n\nreturn [{ json: candidate }];"
       }
     },
     {
