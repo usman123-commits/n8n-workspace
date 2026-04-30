@@ -238,19 +238,19 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": false,
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
               "id": "if-reservation-exists",
-              "leftValue": "={{ $json._noMatch }}",
-              "rightValue": true,
+              "leftValue": "={{ $json.row_number }}",
+              "rightValue": 0,
               "operator": {
-                "type": "boolean",
-                "operation": "notEquals"
+                "type": "number",
+                "operation": "gt"
               }
             }
           ],
