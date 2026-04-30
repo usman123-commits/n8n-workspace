@@ -1,0 +1,72 @@
+{
+  "name": "TEST — SW Haversine GPS Check",
+  "nodes": [
+    {
+      "id": "t1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "webhookId": "sw-haversine-test-v1",
+      "parameters": {
+        "path": "test-haversine",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "t2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
+      "name": "Respond with Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [840, 200],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}",
+        "options": { "responseCode": 200 }
+      }
+    },
+    {
+      "id": "t3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 200],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nreturn [{ json: {\n  gpsLat:      (body.gpsLat      || '').toString(),\n  gpsLng:      (body.gpsLng      || '').toString(),\n  propertyUid: (body.propertyUid || '').toString()\n} }];"
+      }
+    },
+    {
+      "id": "t4d5e6f7-a8b9-c0d1-e2f3-a4b5c6d7e8f9",
+      "name": "Call Haversine Sub-Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [560, 200],
+      "parameters": {
+        "workflowId": "qGJzBKSxwt69YqHl",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Prepare Input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [{ "node": "Call Haversine Sub-Workflow", "type": "main", "index": 0 }]
+      ]
+    },
+    "Call Haversine Sub-Workflow": {
+      "main": [
+        [{ "node": "Respond with Result", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "name": "SW — Haversine GPS Check",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 200],
+      "parameters": {}
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Get Property Coordinates",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [280, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "766791868",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "propertyUid",
+              "lookupValue": "={{ $json.propertyUid }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Calculate Distance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 200],
+      "parameters": {
+        "jsCode": "// Haversine GPS check sub-workflow\n// Input from trigger: { gpsLat, gpsLng, propertyUid }\n// Input from sheet:   { latitude, longitude, ... }\nconst trigger = $('Execute Workflow Trigger').first().json;\nconst coords  = $input.first().json;\n\nconst R = 6371000;\nconst toRad = deg => deg * (Math.PI / 180);\n\nconst gpsLat  = parseFloat(trigger.gpsLat);\nconst gpsLng  = parseFloat(trigger.gpsLng);\nconst propLat = parseFloat(coords.latitude);\nconst propLng = parseFloat(coords.longitude);\n\nif (![gpsLat, gpsLng, propLat, propLng].every(Number.isFinite)) {\n  throw new Error(\n    `Invalid coordinates — gpsLat:${trigger.gpsLat} gpsLng:${trigger.gpsLng} ` +\n    `propLat:${coords.latitude} propLng:${coords.longitude}`\n  );\n}\n\nconst dLat = toRad(propLat - gpsLat);\nconst dLng = toRad(propLng - gpsLng);\nconst a = Math.sin(dLat/2)**2 +\n          Math.cos(toRad(gpsLat)) * Math.cos(toRad(propLat)) * Math.sin(dLng/2)**2;\nconst distance = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));\n\nreturn [{ json: {\n  gpsLat:      trigger.gpsLat,\n  gpsLng:      trigger.gpsLng,\n  propertyLat: coords.latitude,\n  propertyLng: coords.longitude,\n  distance,\n  withinRadius: distance <= 100\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [{ "node": "Get Property Coordinates", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Property Coordinates": {
+      "main": [
+        [{ "node": "Calculate Distance", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
