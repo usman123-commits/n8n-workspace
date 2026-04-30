@@ -3,7 +3,7 @@
 **Goal:** Extract reusable logic into standalone sub-workflows to reduce node counts in large workflows and ensure consistent behaviour across callers.
 
 **Started:** 2026-05-01  
-**Status:** In progress — building and testing sub-workflows. Existing workflows unchanged until approved.
+**Status:** Sub-workflows built and tested ✅ — integration into existing workflows pending user approval (TODO).
 
 ---
 
@@ -106,8 +106,8 @@ Same replacement as 3W above.
 1. ~~Build `sw-haversine-gps-check`~~ ✅ Done
 2. ~~Create test workflow~~ ✅ Done
 3. ~~Run and verify all 3 test cases~~ ✅ All passing
-4. User approves → integrate into 3W
-5. Test 3W clock-in happy path end-to-end
-6. User approves → integrate into 4W
-7. Test 4W checkout happy path end-to-end
-8. Archive test workflow (`BwnNdWgtWeLzqnkb`) — delete from n8n after integration confirmed
+4. **TODO** — integrate into 3W (swap 3 nodes for Execute Workflow call, route on `$json.withinRadius`)
+5. **TODO** — test 3W clock-in happy path end-to-end
+6. **TODO** — integrate into 4W (same swap)
+7. **TODO** — test 4W checkout happy path end-to-end
+8. **TODO** — delete test workflow (`BwnNdWgtWeLzqnkb`) after integration confirmed
