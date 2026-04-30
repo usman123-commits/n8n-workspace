@@ -370,15 +370,37 @@ Not urgent. Ship if node counts per workflow exceed ~40.
 
 ---
 
-## Phase 5 — Sheet Column Cleanup
+## Phase 5 — Sheet Cleanup (Tabs + Columns)
 
-Audit every tab for columns no workflow reads. Candidates likely include:
-- Legacy Google Forms columns on Submissions tabs (`Confirm Arrival`, `Capture Location` string form) — now superseded by normalized columns
-- Any V1 residue
+### Tab Deletions
 
-Do this **last**, after migration is stable. Column removal is the operation most likely to silently break a workflow.
+Audited all 17 tabs on 2026-05-01. Five tabs are dead — no active workflow reads or writes them.
 
-**Approach:** for each tab, `grep` all workflow JSON for column letter and header string; anything with zero hits is a candidate. Remove in a single PR per tab.
+| Tab | gid | Rows | Why dead | When to delete |
+|-----|-----|------|----------|----------------|
+| `Form Responses 1` | `1983546329` | 104 | Old Google Forms checkout responses (supply qty columns, maintenance). Only read by retired WF4 Google Sheets trigger (`VTlIwLr3cK896sLO`). | Now — WF4 already retired |
+| `Raw Form Responses` | `0` | 1013 | Old Google Forms clock-in responses (Timestamp, Booking ID, Cleaner ID, Confirm Arrival, Capture Location). Only read by retired WF3 (`ieebrbqVyvQwb0ig`). | Now — WF3 already retired |
+| `temp` | `1516062411` | ~10 | No header row. Raw scratch data in CleaningJobs format. No workflow ID references it. | Now |
+| `timeStamps` | `1265548981` | 1 | Hostfully poller cursor (`key=config, storedTimestamp`). Only written/read by old poller `JKS8Imjt5Nvp1ReG`. | After old poller deactivated (Phase 2 cutover step 6) |
+| `SupplyInventory` | `2127266498` | 0 data | Headers exist (`itemName, currentQuantity, alertThreshold, lastUpdatedAt`) but zero workflows read or write it. 4W writes to `SupplyUsageLog`, not this. Unfinished feature. | Defer — confirm with architect whether supply inventory tracking is planned |
+
+**Action:** delete `Form Responses 1`, `Raw Form Responses`, and `temp` now. Delete `timeStamps` after old poller is deactivated. Decision needed on `SupplyInventory`.
+
+### Column Audit (active tabs)
+
+Audited on 2026-05-01. Submissions tabs are already clean — no legacy Google Forms column names remain.
+
+| Tab | Status | Notes |
+|-----|--------|-------|
+| `ClockInSubmissions` | ✅ Clean | 8 normalized columns: `bookingUid, cleanerIdFromForm, gpsLat, gpsLng, submissionTimestamp, processingStatus, resultMessage, processedAt` |
+| `CheckoutSubmissions` | ✅ Clean | Same 8 columns as ClockInSubmissions |
+| `Reservations` | ⚠️ Review | 35 columns — likely has legacy columns from old poller. Audit after WF1 cutover. |
+| `CleaningJobs` | ⚠️ Review | 35 columns — audit after WF1 cutover confirms all needed columns. |
+| All others | Not yet audited | Do after migrations are stable |
+
+Do column removal **last**, after all workflow migrations are confirmed stable. Column removal is the operation most likely to silently break a workflow.
+
+**Approach:** for each tab, grep all workflow JSON for the column header string; anything with zero hits is a candidate. Remove in a single commit per tab.
 
 ---
 
@@ -406,6 +428,24 @@ These are not being done now but are captured so they don't get lost.
 **What:** delete from n8n after 1 week of clean runs on merged 3W/4W.
 
 **Why deferred:** keep as deactivated rollback for at least 7 days.
+
+### 4. Fix time storage in Reservations tab (WF 1 — Create Reservation Record node)
+
+**What:** three fields in `Create Reservation Record` are not clean UTC:
+
+| Column | Current (buggy) | Should be |
+|--------|-----------------|-----------|
+| `checkIn` | `checkInLocalDateTime` — local time, no tz info (e.g., `2026-06-13T16:00:00`) | `new Date(checkInZonedDateTime).toISOString()` → `2026-06-13T21:00:00.000Z` |
+| `checkOut` | `checkOutLocalDateTime` — local time, no tz info (e.g., `2026-06-17T10:00:00`) | `new Date(checkOutZonedDateTime).toISOString()` → `2026-06-17T15:00:00.000Z` |
+| `createdUtc` | `metadata.createdUtcDateTime` stored raw — Hostfully names it UTC but sends no `Z` (e.g., `2026-03-05T00:27:45`), parsers treat it as local | append `Z` if missing: `(val.endsWith('Z') ? val : val + 'Z')` |
+| `createdAtSystem` | `$now.toISO()` — n8n server local offset (e.g., `-05:00`), not `Z` | `$now.toUTC().toISO()` |
+
+Note: CleaningJobs tab is already correct — `checkoutTimeUTC` and `scheduledCleaningTimeUTC` are derived from `checkOutZonedDateTime` via `new Date(zoned).toISOString()` which correctly produces UTC with `Z`.
+
+**Why deferred:** the old polling WF 1 stored the same local times (same Hostfully source), so existing rows already have this format. Fixing it mid-table creates inconsistency unless all existing rows are backfilled at the same time. Wait until the old poller is retired and all rows are from the new webhook workflow, then fix and backfill in one operation.
+
+**Workflow file:** `workflows/drafts/cleaning/workflow-1-hostfully-webhook.json`
+**Node to change:** `Create Reservation Record` (columns `checkIn`, `checkOut`, `createdUtc`, `createdAtSystem`)
 
 ---
 
