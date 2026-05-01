@@ -223,13 +223,13 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 | `7X0QKeFueWTdz0GW` | Workflow 5 – Payroll Processing | Schedule (daily 02:00 UTC) | Active |
 | `BQ6uHsWxBcegrfrv` | cancellationHandler | Webhook POST `/webhook/cancellation-handler` | Active |
 | `NZNbIHz9Qutwj1fa` | Extended Checkout Handler | Webhook POST `/webhook/extended-checkout-handler` | Active |
-| `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync (OLD poller) | Schedule (every 1 min) | Active — deactivate after new WF 1 confirmed in prod |
-| `DnVBNO7uxLSrXNYe` | Workflow 1 — Hostfully Booking Ingest (Webhook) | Webhook POST `/webhook/hostfully-booking-event` | **Inactive draft — activate to replace old poller** |
+| `DnVBNO7uxLSrXNYe` | Workflow 1 — Hostfully Booking Ingest (Webhook) | Webhook POST `/webhook/hostfully-booking-event` | **Active — production (Phase 2 live)** |
 
 ### Deactivated / Rollback Only (do not reactivate)
 
 | ID | Workflow Name | Replaced By |
 |----|--------------|-------------|
+| `JKS8Imjt5Nvp1ReG` | Hostfully to Operto Reservation Cleaning Sync (OLD poller) | `DnVBNO7uxLSrXNYe` — delete after 7-day observation (deactivated 2026-05-01) |
 | `qIV56v4P8klISyR2` | Workflow 3W – Clock-In Ingestion (old) | `EbYPXFGOuXeDH5Cw` — delete after 7-day observation |
 | `B7duBLBoOCdLpztS` | Workflow 3B – ClockIn Validation Processor | `EbYPXFGOuXeDH5Cw` — delete after 7-day observation |
 | `ieebrbqVyvQwb0ig` | Workflow 3 – Form Responses 1 to ClockInSubmissions | Fully retired — safe to delete |

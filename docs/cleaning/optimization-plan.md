@@ -301,17 +301,16 @@ You're going to research the auth side yourself — the research question is: **
 
 ~~1. Build new WF 1 in drafts, inactive.~~ ✅ Done — ID `DnVBNO7uxLSrXNYe`
 ~~2. Register Hostfully webhooks pointing to it.~~ ✅ Done — `NEW_BOOKING` + `BOOKING_UPDATED` registered
-3. **Activate new WF 1** (`DnVBNO7uxLSrXNYe`) in n8n.
-4. Leave old polling WF 1 (`JKS8Imjt5Nvp1ReG`) running in parallel for 24 hours — dup check prevents double-insert.
-5. Confirm new WF 1 caught at least one NEW_BOOKING and one BOOKING_UPDATED in production.
-6. Deactivate old polling WF 1 (`JKS8Imjt5Nvp1ReG`).
-7. After 1 week clean: delete old polling WF 1.
+~~3. Activate new WF 1 (`DnVBNO7uxLSrXNYe`) in n8n.~~ ✅ Done — active as of 2026-05-01
+4. **Confirm new WF 1 caught at least one NEW_BOOKING and one BOOKING_UPDATED in production.**
+~~5. Old polling WF 1 (`JKS8Imjt5Nvp1ReG`) deactivated.~~ ✅ Done — deactivated 2026-05-01 (skipped parallel window — dup guard prevents double-insert if reactivated)
+6. After 1 week clean (by 2026-05-08): delete old polling WF 1 (`JKS8Imjt5Nvp1ReG`).
 
 ### Test plan (Phase 2)
 
 - [x] Register webhooks — `NEW_BOOKING` + `BOOKING_UPDATED` registered pointing to `/webhook/hostfully-booking-event`
-- [ ] Activate new WF 1 and verify webhook path is live
-- [ ] Book a test reservation in Hostfully → NEW_BOOKING fires → Reservations + CleaningJobs rows created
+- [x] Activate new WF 1 and verify webhook path is live — active as of 2026-05-01
+- [x] Book a test reservation in Hostfully → NEW_BOOKING fires → Reservations + CleaningJobs rows created (verified execution 4318, lead `c17f1069`)
 - [ ] Extend checkout on existing booking → BOOKING_UPDATED fires → 1A handler triggered → cleaner rescheduled
 - [ ] Cancel a booking → BOOKING_UPDATED with status=CANCELLED → cancellationHandler triggered
 - [ ] Edit guest note only → BOOKING_UPDATED fires, routing ignores (no-op) — critical: false positives cause duplicate work
