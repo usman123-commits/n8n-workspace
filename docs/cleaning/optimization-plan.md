@@ -446,6 +446,23 @@ Note: CleaningJobs tab is already correct — `checkoutTimeUTC` and `scheduledCl
 **Workflow file:** `workflows/drafts/cleaning/workflow-1-hostfully-webhook.json`
 **Node to change:** `Create Reservation Record` (columns `checkIn`, `checkOut`, `createdUtc`, `createdAtSystem`)
 
+### 5. Handle OFFERED job status in cancellationHandler and Extended Checkout Handler
+
+**What:** Neither the `cancellationHandler` workflow nor the `Extended Checkout Handler` currently checks whether the CleaningJob is already in `OFFERED` status (WF2 has already sent an offer to a cleaner) before proceeding.
+
+**Current risk:**
+- **Cancellation path:** If a booking is cancelled while a cleaner offer is outstanding, `cancellationHandler` fires (marks job CANCELLED, sends cancellation email to cleaner) but the cleaner still holds an active `acceptLink` / `declineLink`. If they click Accept after cancellation, WF2B will process the response against a CANCELLED job.
+- **Extended checkout path:** If checkout is extended while an offer is outstanding, the extended checkout handler reschedules the calendar event and updates the sheet, but the cleaner's offer links still point to the old time. The cleaner may accept based on the old schedule.
+
+**Fix needed (both handlers):**
+1. After looking up the Reservation/CleaningJob row, check `status`
+2. If `status = OFFERED`: send a retraction message to the cleaner (or at minimum log it) before proceeding with cancellation/rescheduling
+3. Optionally: flip `status` to a transitional state (`CANCELLING`, `RESCHEDULING`) during processing to prevent WF2B from acting on a stale accept/decline
+
+**Why deferred:** requires changes to both `cancellationHandler` and `Extended Checkout Handler` workflows plus possibly `WF2B`. Scope is larger than WF1 alone. Defer until WF1 is stable in production for at least one week.
+
+**Workflows affected:** `cancellationHandler` (`BQ6uHsWxBcegrfrv`), `Extended Checkout Handler` (`NZNbIHz9Qutwj1fa`), potentially `WF2B – Job Response Handler` (`IZIywHWhoK32cp7Z`)
+
 ---
 
 ## Rollout Order (recommended)
