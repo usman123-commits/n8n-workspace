@@ -205,6 +205,7 @@ curl -s http://localhost:5678/api/v1/executions/EXECUTION_ID \
 |---------|--------|--------|------|
 | **Cleaning Operations** | `cleaning/` | Active (7 workflows) | `docs/cleaning/` |
 | **Cold Email** | `cold-email/` | New | `docs/cold-email/` |
+| **Messaging Sync (GHL ↔ Hostfully)** | `messaging-sync/` | Spec — awaiting provisioning from David | `docs/messaging-sync/` |
 
 ---
 
