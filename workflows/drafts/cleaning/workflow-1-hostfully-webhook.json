@@ -246,11 +246,11 @@
           "conditions": [
             {
               "id": "if-reservation-exists",
-              "leftValue": "={{ $json.row_number }}",
-              "rightValue": 0,
+              "leftValue": "={{ String($json.bookingUid || '') }}",
+              "rightValue": "",
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "string",
+                "operation": "notEquals"
               }
             }
           ],

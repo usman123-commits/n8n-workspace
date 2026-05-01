@@ -300,13 +300,38 @@ Lookup Reservation (returns {}) → Reservation Exists? → Create Reservation R
                                           $json here = {} from the lookup, NOT the lead data
 ```
 
-Fix: insert a Code node to explicitly set `$json` to the correct source:
-```javascript
-// Pass Lead Data node — placed between Reservation Exists? and Create Reservation Record
-return [{ json: $('Unwrap Lead').first().json }];
-```
-
 **`$('NodeName').first().json.*` works fine inside Google Sheets column expressions.** Use it whenever `$json` at that point contains the wrong data (e.g. an empty lookup result). No Code node needed — reference the correct upstream node directly.
+
+### ⚠️ Critical: Never Assume a Node's Output Fields — Verify First
+
+Do not assume what fields a node outputs based on intuition or prior experience with other tools.
+**Wrong fields in expressions cause silent undefined bugs that only appear at runtime.**
+
+**Rule:** Before using any field from a node's output in a downstream expression, confirm that field actually exists in the output. Two ways to verify:
+
+1. **Run the workflow once and read the execution log** — the n8n UI shows the exact JSON each node outputs. This is always authoritative.
+2. **Check the official n8n docs for that node type** — [docs.n8n.io](https://docs.n8n.io) lists the exact output schema for every built-in node.
+
+**Known output schemas (confirmed from execution logs):**
+
+| Node | Operation | What it outputs |
+|------|-----------|-----------------|
+| Google Sheets | Lookup row | The matched row's column values as `{ columnName: value, ... }`. **No `row_number`, no metadata.** When not found + `alwaysOutputData: true` → `{}` |
+| Google Sheets | Append row | The appended row's data |
+| HTTP Request | Any | The raw response body parsed as JSON (or text) |
+| Webhook | Trigger | `{ headers: {}, body: {}, ... }` — body fields NOT at top level until unwrapped |
+| Code | Any | Whatever you explicitly `return` — nothing else |
+
+**Reliable existence check after Google Sheets Lookup:**
+```json
+{
+  "leftValue": "={{ String($json.someRequiredColumn || '') }}",
+  "rightValue": "",
+  "operator": { "type": "string", "operation": "notEquals" }
+}
+```
+Use a column that is **always populated** in that sheet (e.g. `bookingUid`, `cleaningJobId`).
+Never use `$json.row_number` — it is not in the Google Sheets node output.
 
 ### Sheet Tab IDs (V2 Spreadsheet)
 
