@@ -300,7 +300,8 @@
             "cleaningStatus": "PENDING",
             "maintenanceStatus": "NONE",
             "payrollStatus": "NOT_STARTED",
-            "createdAtSystem": "={{ $now.toISO() }}"
+            "createdAtSystem": "={{ $now.toISO() }}",
+            "childrenCount": "={{ $('Unwrap Lead').first().json.guestInformation?.childrenCount ?? '' }}"
           },
           "schema": [
             {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
