@@ -267,6 +267,47 @@ For `sheetName`, use `"mode": "id"` with the numeric gid:
 ```
 **Never use `"mode": "name"` or `"mode": "list"`** — they are unreliable and will break.
 
+### ⚠️ Critical: Google Sheets Append Nodes Require a `schema` Field
+
+When writing a Google Sheets append node with `"mappingMode": "defineBelow"`, you **must** include a `schema` array alongside the `value` map. Without it, n8n throws `"Could not get parameter: columns.schema"` at runtime even if all expressions are correct.
+
+```json
+"columns": {
+  "mappingMode": "defineBelow",
+  "value": {
+    "columnA": "={{ $json.fieldA }}",
+    "columnB": "LITERAL"
+  },
+  "schema": [
+    {"id": "columnA", "displayName": "columnA", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+    {"id": "columnB", "displayName": "columnB", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+  ]
+}
+```
+
+Every column in `value` must have a matching entry in `schema`. Use `"type": "string"` for all columns.
+
+### ⚠️ Critical: Always Use `$json` from the Directly Connected Node
+
+In n8n, `$json` refers to the output of the **immediately preceding connected node**. When a node in the middle of a chain (e.g. an IF or Sheets lookup) strips or replaces the data, downstream nodes using `$json` will get the wrong data.
+
+**Rule:** Before writing any expression in a node, trace what `$json` actually contains at that point. Ask: "What node feeds this one, and what does it output?"
+
+Common trap — Google Sheets lookup followed by a write node:
+```
+Lookup Reservation (returns {}) → Reservation Exists? → Create Reservation Record
+                                                          ↑
+                                          $json here = {} from the lookup, NOT the lead data
+```
+
+Fix: insert a Code node to explicitly set `$json` to the correct source:
+```javascript
+// Pass Lead Data node — placed between Reservation Exists? and Create Reservation Record
+return [{ json: $('Unwrap Lead').first().json }];
+```
+
+**`$('NodeName').first().json.*` works fine inside Google Sheets column expressions.** Use it whenever `$json` at that point contains the wrong data (e.g. an empty lookup result). No Code node needed — reference the correct upstream node directly.
+
 ### Sheet Tab IDs (V2 Spreadsheet)
 
 | Tab Name | Sheet ID (gid) | Purpose |

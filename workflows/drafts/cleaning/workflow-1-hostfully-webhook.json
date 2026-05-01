@@ -289,19 +289,35 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "bookingUid": "={{ $json.uid }}",
-            "propertyUid": "={{ $json.propertyUid }}",
-            "guestName": "={{ ($json.guestInformation?.firstName || '') + ' ' + ($json.guestInformation?.lastName || '') }}",
-            "checkIn": "={{ $json.checkInLocalDateTime }}",
-            "checkOut": "={{ $json.checkOutLocalDateTime }}",
-            "adultCount": "={{ $json.guestInformation?.adultCount ?? '' }}",
-            "source": "={{ $json.channel }}",
-            "createdUtc": "={{ $json.metadata?.createdUtcDateTime }}",
+            "bookingUid": "={{ $('Unwrap Lead').first().json.uid }}",
+            "propertyUid": "={{ $('Unwrap Lead').first().json.propertyUid }}",
+            "guestName": "={{ ($('Unwrap Lead').first().json.guestInformation?.firstName || '') + ' ' + ($('Unwrap Lead').first().json.guestInformation?.lastName || '') }}",
+            "checkIn": "={{ $('Unwrap Lead').first().json.checkInLocalDateTime }}",
+            "checkOut": "={{ $('Unwrap Lead').first().json.checkOutLocalDateTime }}",
+            "adultCount": "={{ $('Unwrap Lead').first().json.guestInformation?.adultCount ?? '' }}",
+            "source": "={{ $('Unwrap Lead').first().json.channel }}",
+            "createdUtc": "={{ $('Unwrap Lead').first().json.metadata?.createdUtcDateTime }}",
             "cleaningStatus": "PENDING",
             "maintenanceStatus": "NONE",
             "payrollStatus": "NOT_STARTED",
             "createdAtSystem": "={{ $now.toISO() }}"
-          }
+          },
+          "schema": [
+            {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "propertyUid", "displayName": "propertyUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "guestName", "displayName": "guestName", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "checkIn", "displayName": "checkIn", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "checkOut", "displayName": "checkOut", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "adultCount", "displayName": "adultCount", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "source", "displayName": "source", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "createdUtc", "displayName": "createdUtc", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "cleaningStatus", "displayName": "cleaningStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "cleaningJobId", "displayName": "cleaningJobId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "createdAtSystem", "displayName": "createdAtSystem", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "childrenCount", "displayName": "childrenCount", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "maintenanceStatus", "displayName": "maintenanceStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "payrollStatus", "displayName": "payrollStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+          ]
         },
         "options": {}
       }
@@ -358,7 +374,40 @@
             "scheduledCleaningTimeUTC": "={{ $json.scheduledCleaningTimeUTC }}",
             "status": "PENDING",
             "createdAtSystem": "={{ $json.createdAtSystem }}"
-          }
+          },
+          "schema": [
+            {"id": "cleaningJobId", "displayName": "cleaningJobId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "bookingUid", "displayName": "bookingUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "propertyUid", "displayName": "propertyUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "cleaningDate", "displayName": "cleaningDate", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "cleaningTime", "displayName": "cleaningTime", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "status", "displayName": "status", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "assignedCleaner", "displayName": "assignedCleaner", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "clockIn", "displayName": "clockIn", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "clockOut", "displayName": "clockOut", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "workedHours", "displayName": "workedHours", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "createdAtSystem", "displayName": "createdAtSystem", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "cleanerId", "displayName": "cleanerId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "assignedAt", "displayName": "assignedAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "notificationStatus", "displayName": "notificationStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "calendarStatus", "displayName": "calendarStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "calendarEventId", "displayName": "calendarEventId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "calendarId", "displayName": "calendarId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "processingFlag", "displayName": "processingFlag", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "clockInTimeUTC", "displayName": "clockInTimeUTC", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "gpsClockInLat", "displayName": "gpsClockInLat", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "gpsClockInLng", "displayName": "gpsClockInLng", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "gpsStatus", "displayName": "gpsStatus", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "lateFlag", "displayName": "lateFlag", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "checkoutTimeUTC", "displayName": "checkoutTimeUTC", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "scheduledCleaningTimeUTC", "displayName": "scheduledCleaningTimeUTC", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "adminCalendarEventId", "displayName": "adminCalendarEventId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "clockInLink", "displayName": "clockInLink", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "clockOutLink", "displayName": "clockOutLink", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "clockOutTimeUTC", "displayName": "clockOutTimeUTC", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "gpsClockOutLat", "displayName": "gpsClockOutLat", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "gpsClockOutLng", "displayName": "gpsClockOutLng", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+          ]
         },
         "options": {}
       }
