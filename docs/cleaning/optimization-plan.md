@@ -375,15 +375,19 @@ Not urgent. Ship if node counts per workflow exceed ~40.
 
 Audited all 17 tabs on 2026-05-01. Five tabs are dead — no active workflow reads or writes them.
 
-| Tab | gid | Rows | Why dead | When to delete |
-|-----|-----|------|----------|----------------|
-| `Form Responses 1` | `1983546329` | 104 | Old Google Forms checkout responses (supply qty columns, maintenance). Only read by retired WF4 Google Sheets trigger (`VTlIwLr3cK896sLO`). | Now — WF4 already retired |
-| `Raw Form Responses` | `0` | 1013 | Old Google Forms clock-in responses (Timestamp, Booking ID, Cleaner ID, Confirm Arrival, Capture Location). Only read by retired WF3 (`ieebrbqVyvQwb0ig`). | Now — WF3 already retired |
-| `temp` | `1516062411` | ~10 | No header row. Raw scratch data in CleaningJobs format. No workflow ID references it. | Now |
-| `timeStamps` | `1265548981` | 1 | Hostfully poller cursor (`key=config, storedTimestamp`). Only written/read by old poller `JKS8Imjt5Nvp1ReG`. | After old poller deactivated (Phase 2 cutover step 6) |
-| `SupplyInventory` | `2127266498` | 0 data | Headers exist (`itemName, currentQuantity, alertThreshold, lastUpdatedAt`) but zero workflows read or write it. 4W writes to `SupplyUsageLog`, not this. Unfinished feature. | Defer — confirm with architect whether supply inventory tracking is planned |
+| Tab | gid | Rows | Why dead | Status |
+|-----|-----|------|----------|--------|
+| `Form Responses 1` | `1983546329` | 104 | Old Google Forms checkout responses. Only read by retired WF4 (`VTlIwLr3cK896sLO`). | **TODO: delete** |
+| `Raw Form Responses` | `0` | 1013 | Old Google Forms clock-in responses. Only read by retired WF3 (`ieebrbqVyvQwb0ig`). | **TODO: delete** |
+| `temp` | `1516062411` | ~10 | No header row, no workflow references it. | **TODO: delete** |
+| `timeStamps` | `1265548981` | 1 | Hostfully poller cursor. Old poller deactivated 2026-05-01. | **TODO: delete** |
+| `SupplyInventory` | `2127266498` | 0 data | Headers: `itemName, currentQuantity, alertThreshold, lastUpdatedAt`. **Keep — will be used in supply inventory tracking logic.** | ✅ Keep |
 
-**Action:** delete `Form Responses 1`, `Raw Form Responses`, and `temp` now. Delete `timeStamps` after old poller is deactivated. Decision needed on `SupplyInventory`.
+**TODO:** Delete these 4 tabs from the V2 spreadsheet (architect to action in Google Sheets UI):
+- `Form Responses 1` (gid `1983546329`)
+- `Raw Form Responses` (gid `0`)
+- `temp` (gid `1516062411`)
+- `timeStamps` (gid `1265548981`)
 
 ### Column Audit (active tabs)
 
