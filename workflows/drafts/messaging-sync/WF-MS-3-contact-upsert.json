@@ -1,0 +1,240 @@
+{
+  "name": "WF-MS-3 -- GHL Contact + Opportunity Upsert (sub-workflow)",
+  "nodes": [
+    {
+      "id": "5cf35bba-4815-494f-9932-a1cc27f2de0c",
+      "name": "When Called by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "ms3-config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-loc",
+              "name": "GHL_LOCATION_ID",
+              "value": "RSZ3HWAGH7WnU52Zs6aW",
+              "type": "string"
+            },
+            {
+              "id": "cfg-pipeline",
+              "name": "GHL_PIPELINE_ID",
+              "value": "5mNaQ5aMF70J8l6bVFyq",
+              "type": "string"
+            },
+            {
+              "id": "cfg-stage",
+              "name": "GHL_STAGE_CONFIRMED",
+              "value": "3150593c-e63e-4713-af6e-a8ee7d2673e4",
+              "type": "string"
+            },
+            {
+              "id": "cfg-cf-lead",
+              "name": "OPP_CF_HOSTFULLY_LEAD_UID",
+              "value": "mFOv6tOfZXQHU0nUroSQ",
+              "type": "string"
+            },
+            {
+              "id": "cfg-cf-thread",
+              "name": "OPP_CF_HOSTFULLY_THREAD_UID",
+              "value": "dzc0UzKrnbqQ4bkpVfPi",
+              "type": "string"
+            },
+            {
+              "id": "cfg-cf-prop",
+              "name": "OPP_CF_HOSTFULLY_PROPERTY_UID",
+              "value": "OcKjrX8QYH3Wy560M0S6",
+              "type": "string"
+            },
+            {
+              "id": "cfg-cf-checkin",
+              "name": "OPP_CF_RESERVATION_CHECK_IN",
+              "value": "2dysIUxv0Za7Q8vGfY1J",
+              "type": "string"
+            },
+            {
+              "id": "cfg-cf-checkout",
+              "name": "OPP_CF_RESERVATION_CHECK_OUT",
+              "value": "oiAofVAg35cGng46JUIp",
+              "type": "string"
+            },
+            {
+              "id": "cfg-cf-channel",
+              "name": "OPP_CF_BOOKING_CHANNEL",
+              "value": "H4sqwJ0NKQgDUiVDfXH1",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8e679a96-f9cd-4f48-935b-4d97dd19402f",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300],
+      "parameters": {
+        "jsCode": "const raw = $('When Called by Another Workflow').first().json;\n\nfunction normalizeEmail(e) {\n  if (!e) return '';\n  return String(e).trim().toLowerCase();\n}\n\nfunction normalizePhoneE164(p) {\n  if (!p) return '';\n  let digits = String(p).replace(/[^0-9+]/g, '');\n  if (digits.startsWith('+')) return digits;\n  if (digits.length === 10) return '+1' + digits;\n  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;\n  return '+' + digits;\n}\n\nconst out = {\n  leadUid: raw.leadUid || raw.lead_uid || '',\n  threadUid: raw.threadUid || raw.thread_uid || '',\n  propertyUid: raw.propertyUid || raw.property_uid || '',\n  firstName: (raw.firstName || raw.first_name || '').toString().trim(),\n  lastName: (raw.lastName || raw.last_name || '').toString().trim(),\n  email: normalizeEmail(raw.email),\n  phone: normalizePhoneE164(raw.phone),\n  channel: raw.channel || raw.booking_channel || 'Direct',\n  checkIn: raw.checkIn || raw.check_in || '',\n  checkOut: raw.checkOut || raw.check_out || ''\n};\n\nif (!out.email && !out.phone) {\n  throw new Error('Cannot upsert GHL contact: both email and phone are missing. Lead UID: ' + out.leadUid);\n}\n\nreturn [{ json: out }];"
+      }
+    },
+    {
+      "id": "98d475dd-0efb-443b-926b-fd52fcf5a797",
+      "name": "GHL Upsert Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/contacts/upsert",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"locationId\": \"{{ $('Config').first().json.GHL_LOCATION_ID }}\",\n  \"firstName\": \"{{ $json.firstName }}\",\n  \"lastName\": \"{{ $json.lastName }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"phone\": \"{{ $json.phone }}\",\n  \"source\": \"Hostfully\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "b3a1d2e4-0001-4000-b000-000000000001",
+      "name": "Extract Contact ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 300],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst contact = resp.contact || resp;\n\nif (!contact.id) {\n  throw new Error('GHL upsert returned no contact ID. Response: ' + JSON.stringify(resp));\n}\n\nconst lead = $('Normalize Lead Data').first().json;\n\nreturn [{\n  json: {\n    ghlContactId: contact.id,\n    isNewContact: !!resp.new,\n    leadUid: lead.leadUid,\n    threadUid: lead.threadUid,\n    propertyUid: lead.propertyUid,\n    firstName: lead.firstName,\n    lastName: lead.lastName,\n    email: lead.email,\n    phone: lead.phone,\n    channel: lead.channel,\n    checkIn: lead.checkIn,\n    checkOut: lead.checkOut\n  }\n}];"
+      }
+    },
+    {
+      "id": "b3a1d2e4-0002-4000-b000-000000000002",
+      "name": "Create Opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/opportunities/",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"pipelineId\": \"{{ $('Config').first().json.GHL_PIPELINE_ID }}\",\n  \"pipelineStageId\": \"{{ $('Config').first().json.GHL_STAGE_CONFIRMED }}\",\n  \"locationId\": \"{{ $('Config').first().json.GHL_LOCATION_ID }}\",\n  \"contactId\": \"{{ $json.ghlContactId }}\",\n  \"name\": \"{{ $json.channel }} - {{ $json.firstName }} {{ $json.lastName }} ({{ $json.checkIn || 'no dates' }})\",\n  \"status\": \"open\",\n  \"customFields\": [\n    { \"id\": \"{{ $('Config').first().json.OPP_CF_HOSTFULLY_LEAD_UID }}\", \"field_value\": \"{{ $json.leadUid }}\" },\n    { \"id\": \"{{ $('Config').first().json.OPP_CF_HOSTFULLY_THREAD_UID }}\", \"field_value\": \"{{ $json.threadUid }}\" },\n    { \"id\": \"{{ $('Config').first().json.OPP_CF_HOSTFULLY_PROPERTY_UID }}\", \"field_value\": \"{{ $json.propertyUid }}\" },\n    { \"id\": \"{{ $('Config').first().json.OPP_CF_RESERVATION_CHECK_IN }}\", \"field_value\": \"{{ $json.checkIn }}\" },\n    { \"id\": \"{{ $('Config').first().json.OPP_CF_RESERVATION_CHECK_OUT }}\", \"field_value\": \"{{ $json.checkOut }}\" },\n    { \"id\": \"{{ $('Config').first().json.OPP_CF_BOOKING_CHANNEL }}\", \"field_value\": \"{{ $json.channel }}\" }\n  ]\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "b3a1d2e4-0003-4000-b000-000000000003",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 300],
+      "parameters": {
+        "jsCode": "const oppResp = $input.first().json;\nconst opp = oppResp.opportunity || oppResp;\nconst prev = $('Extract Contact ID').first().json;\n\nreturn [{\n  json: {\n    ghlContactId: prev.ghlContactId,\n    ghlOpportunityId: opp.id || '',\n    threadUid: prev.threadUid,\n    leadUid: prev.leadUid,\n    isNewContact: prev.isNewContact,\n    email: prev.email,\n    phone: prev.phone\n  }\n}];"
+      }
+    },
+    {
+      "id": "7ed1b56e-a3ef-4e84-a3ca-0b281efd4175",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 60],
+      "parameters": {
+        "width": 1200,
+        "height": 260,
+        "content": "## WF-MS-3 -- GHL Contact + Opportunity Upsert\n\n**Sub-workflow.** Called by WF-MS-1 (inbound) and WF1 (NEW_BOOKING).\n\n**Flow:** Upsert Contact (name/email/phone only, NO booking custom fields) -> Create Opportunity (per booking, with 6 custom fields: thread UID, lead UID, property UID, check-in, check-out, channel).\n\nThis solves the multi-booking overwrite problem: each booking is its own Opportunity. The Contact is the master record for the guest.\n\n**Input:** leadUid, threadUid, propertyUid, firstName, lastName, email, phone, channel, checkIn, checkOut\n**Output:** { ghlContactId, ghlOpportunityId, threadUid, leadUid, isNewContact }\n\n**Before activating:**\n- Create Pipeline 'Guest Bookings' in GHL UI -> get Pipeline ID + Stage ID\n- Create 6 custom fields on the Opportunity model (not Contact) -> get field IDs\n- Replace all PLACEHOLDER values in Config node"
+      }
+    }
+  ],
+  "connections": {
+    "When Called by Another Workflow": {
+      "main": [[{"node": "Config", "type": "main", "index": 0}]]
+    },
+    "Config": {
+      "main": [[{"node": "Normalize Lead Data", "type": "main", "index": 0}]]
+    },
+    "Normalize Lead Data": {
+      "main": [[{"node": "GHL Upsert Contact", "type": "main", "index": 0}]]
+    },
+    "GHL Upsert Contact": {
+      "main": [[{"node": "Extract Contact ID", "type": "main", "index": 0}]]
+    },
+    "Extract Contact ID": {
+      "main": [[{"node": "Create Opportunity", "type": "main", "index": 0}]]
+    },
+    "Create Opportunity": {
+      "main": [[{"node": "Format Output", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,671 @@
+{
+  "name": "WF-MS-1 -- Hostfully -> GHL Inbound",
+  "nodes": [
+    {
+      "id": "868b96b8-4f60-491a-a4de-bc6d9e433f29",
+      "name": "Hostfully Inbox Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "hostfully-inbox-message",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hostfully-inbox-message",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "ms1-config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-agency-wh",
+              "name": "AGENCY_UID_WEBHOOK",
+              "value": "35842d2f-b5c1-46fa-a33d-a12756b42ed8",
+              "type": "string"
+            },
+            {
+              "id": "cfg-agency-api",
+              "name": "AGENCY_UID_API",
+              "value": "35842d2f-b5c1-46fa-a33d-a12756b42ed8",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "dd087e5e-5158-4a55-ad60-2e4392c25b2e",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [640, 400],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "844c0496-b006-4d0b-a0bd-f0bd6c3e1029",
+      "name": "Agency Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [860, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "agency-cond",
+              "leftValue": "={{ $('Hostfully Inbox Webhook').first().json.body.agency_uid || $('Hostfully Inbox Webhook').first().json.body.agencyUid }}",
+              "rightValue": "={{ $('Config').first().json.AGENCY_UID_WEBHOOK }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c3611a15-a5fb-4470-8679-ddd1639f3982",
+      "name": "Event Type = NEW_INBOX_MESSAGE",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1080, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "event-cond",
+              "leftValue": "={{ $('Hostfully Inbox Webhook').first().json.body.event_type }}",
+              "rightValue": "NEW_INBOX_MESSAGE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4803fd16-702f-413a-a01c-eb7ff46fef51",
+      "name": "Build Dedup Key",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1300, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-key",
+              "name": "messageKey",
+              "value": "=hf:{{ $('Hostfully Inbox Webhook').first().json.body.message_uid }}",
+              "type": "string"
+            },
+            {
+              "id": "msg-uid",
+              "name": "messageUid",
+              "value": "={{ $('Hostfully Inbox Webhook').first().json.body.message_uid }}",
+              "type": "string"
+            },
+            {
+              "id": "thread-uid",
+              "name": "threadUid",
+              "value": "={{ $('Hostfully Inbox Webhook').first().json.body.thread_uid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "118d5e2e-4320-48a3-bbc5-da1117b79231",
+      "name": "Lookup MessageDedup",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1520, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1282682083",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "messageKey",
+              "lookupValue": "={{ $json.messageKey }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": false
+        },
+        "alwaysOutputData": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "518649c9-9136-41c1-80f2-5b27734cb9dc",
+      "name": "Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1740, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dedup-cond",
+              "leftValue": "={{ String($json.messageKey || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ca287ada-14e7-442f-a2a0-0e3d3228c1bd",
+      "name": "Fetch Full Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9KxNwfaP8qRHdRPm",
+          "name": "Hostfully API"
+        }
+      },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://platform.hostfully.com/api/v3.2/messages/{{ $('Build Dedup Key').first().json.messageUid }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "agencyUid",
+              "value": "={{ $('Config').first().json.AGENCY_UID_API }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6715889d-db12-4cb6-95b5-2378747e02e5",
+      "name": "Unwrap Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2180, 500],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst msg = raw.message || raw;\nif (!msg.uid && !msg.message_uid && !msg.id) {\n  throw new Error('Hostfully message response unexpected shape: ' + JSON.stringify(raw).slice(0, 300));\n}\nreturn [{ json: {\n  uid: msg.uid || msg.message_uid || msg.id || '',\n  threadUid: msg.threadUid || msg.thread_uid || $('Build Dedup Key').first().json.threadUid,\n  leadUid: msg.leadUid || msg.lead_uid || '',\n  propertyUid: msg.propertyUid || msg.property_uid || '',\n  type: msg.type || '',\n  body: msg.body || msg.content || msg.message || '',\n  createdAt: msg.createdAt || msg.created_at || ''\n}}];"
+      }
+    },
+    {
+      "id": "5594fbd1-9314-48de-b5c4-6601e1c649f8",
+      "name": "Direction = GUEST_TO_HOST",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2400, 500],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dir-cond",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "GUEST_TO_HOST",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6899eaed-60f1-4fcd-a2b3-2fd19848e786",
+      "name": "Lookup ThreadContactMap",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2620, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1241749258",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "threadUid",
+              "lookupValue": "={{ $('Build Dedup Key').first().json.threadUid }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": false
+        },
+        "alwaysOutputData": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b71ca81a-d6cc-432c-a0a4-2836c6a62eb9",
+      "name": "Contact Cached?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2840, 500],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cache-cond",
+              "leftValue": "={{ String($json.ghlContactId || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "705b8cab-7c06-46f5-8855-c65238571155",
+      "name": "Use Cached Contact",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3060, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ghl-id",
+              "name": "ghlContactId",
+              "value": "={{ $json.ghlContactId }}",
+              "type": "string"
+            },
+            {
+              "id": "thread-uid-c",
+              "name": "threadUid",
+              "value": "={{ $('Build Dedup Key').first().json.threadUid }}",
+              "type": "string"
+            },
+            {
+              "id": "lead-uid-c",
+              "name": "leadUid",
+              "value": "={{ $('Unwrap Message').first().json.leadUid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6328c9ce-2fcb-4646-8159-37756a20af83",
+      "name": "Fetch Lead by UID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3060, 620],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9KxNwfaP8qRHdRPm",
+          "name": "Hostfully API"
+        }
+      },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://platform.hostfully.com/api/v3/leads/{{ $('Unwrap Message').first().json.leadUid }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "agencyUid",
+              "value": "={{ $('Config').first().json.AGENCY_UID_API }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "87524164-af26-47a9-992d-adb4fa9b9f46",
+      "name": "Build Upsert Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3280, 620],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst lead = raw.lead || raw;\nconst msg = $('Unwrap Message').first().json;\nconst keys = $('Build Dedup Key').first().json;\n\nreturn [{\n  json: {\n    leadUid: msg.leadUid || '',\n    threadUid: keys.threadUid,\n    propertyUid: msg.propertyUid || lead.propertyUid || '',\n    firstName: lead.firstName || lead.first_name || '',\n    lastName: lead.lastName || lead.last_name || '',\n    email: lead.email || '',\n    phone: lead.phone || '',\n    channel: lead.source || lead.channel || 'Direct',\n    checkIn: lead.checkInDate || lead.checkIn || '',\n    checkOut: lead.checkOutDate || lead.checkOut || ''\n  }\n}];"
+      }
+    },
+    {
+      "id": "04e0e022-f3c6-4ac6-a892-2c403f2a22ee",
+      "name": "Call WF-MS-3 (Contact Upsert)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [3500, 620],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "mNQZDscqiXYetCPS",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc3fef96-8f36-4461-91ec-29fbd7a9abaa",
+      "name": "Merge Contact Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3720, 500],
+      "parameters": {
+        "mode": "append"
+      }
+    },
+    {
+      "id": "c87348aa-4306-40d2-a82d-740a38d67c55",
+      "name": "Post Inbound Message to GHL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3940, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/conversations/messages/inbound",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"Email\",\n  \"contactId\": \"{{ $json.ghlContactId }}\",\n  \"message\": \"{{ ($('Unwrap Message').first().json.body || '').toString().replace(/\\\\/g,'\\\\\\\\').replace(/\"/g,'\\\\\"').replace(/\\n/g,'\\\\n') }}\",\n  \"direction\": \"inbound\",\n  \"altId\": \"{{ $('Build Dedup Key').first().json.messageUid }}\"\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "08c7b378-548b-4ed7-baae-aecf7d539dc8",
+      "name": "Append MessageDedup",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [4160, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1282682083",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "messageKey": "=hf:{{ $('Build Dedup Key').first().json.messageUid }}",
+            "direction": "inbound",
+            "createdAt": "={{ new Date().toISOString() }}"
+          },
+          "schema": [
+            {"id": "messageKey", "displayName": "messageKey", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "direction", "displayName": "direction", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "createdAt", "displayName": "createdAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4e0084bc-51cd-4279-99f1-dd953c258cf8",
+      "name": "Upsert ThreadContactMap",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [4380, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1241749258",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["threadUid"],
+          "value": {
+            "threadUid": "={{ $('Build Dedup Key').first().json.threadUid }}",
+            "ghlContactId": "={{ $('Post Inbound Message to GHL').first().json.contactId || $json.ghlContactId }}",
+            "ghlOpportunityId": "={{ $json.ghlOpportunityId || '' }}",
+            "leadUid": "={{ $('Unwrap Message').first().json.leadUid }}",
+            "lastSeenAt": "={{ new Date().toISOString() }}"
+          },
+          "schema": [
+            {"id": "threadUid", "displayName": "threadUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "ghlContactId", "displayName": "ghlContactId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "ghlOpportunityId", "displayName": "ghlOpportunityId", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "leadUid", "displayName": "leadUid", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "lastSeenAt", "displayName": "lastSeenAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ms1-sticky",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 60],
+      "parameters": {
+        "width": 1400,
+        "height": 280,
+        "content": "## WF-MS-1 -- Hostfully -> GHL Inbound\n\n**Webhook:** `POST /webhook/hostfully-inbox-message`\n\n**Real webhook payload (4 fields only):** agency_uid, message_uid, event_type, thread_uid.\nFull message data (leadUid, propertyUid, body, type) is fetched from GET /api/v3.2/messages/{message_uid}.\n\n**Flow:** Webhook -> Config -> ACK 200 -> Agency check -> event_type filter -> Build Dedup Key -> MessageDedup lookup -> if new: Fetch Full Message -> Unwrap -> direction filter (GUEST_TO_HOST only) -> ThreadContactMap lookup -> if cached use it, else fetch lead + WF-MS-3 -> POST GHL inbound (type=Email) -> write dedup + map.\n\n**No Custom Conversation Provider needed.** Messages are posted as type Email. GHL outbound replies are received via standard GHL webhook (Settings -> Integrations -> Webhooks -> OutboundMessage event -> WF-MS-2 URL).\n\n**Config node:** update AGENCY_UID_WEBHOOK, AGENCY_UID_API before activating.\n**GHL credential:** replace VwJj55d4veBRjPmF on Post Inbound Message to GHL node."
+      }
+    }
+  ],
+  "connections": {
+    "Hostfully Inbox Webhook": {
+      "main": [[{"node": "Config", "type": "main", "index": 0}]]
+    },
+    "Config": {
+      "main": [[{"node": "Respond 200 OK", "type": "main", "index": 0}]]
+    },
+    "Respond 200 OK": {
+      "main": [[{"node": "Agency Check", "type": "main", "index": 0}]]
+    },
+    "Agency Check": {
+      "main": [
+        [{"node": "Event Type = NEW_INBOX_MESSAGE", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Event Type = NEW_INBOX_MESSAGE": {
+      "main": [
+        [{"node": "Build Dedup Key", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Build Dedup Key": {
+      "main": [[{"node": "Lookup MessageDedup", "type": "main", "index": 0}]]
+    },
+    "Lookup MessageDedup": {
+      "main": [[{"node": "Already Processed?", "type": "main", "index": 0}]]
+    },
+    "Already Processed?": {
+      "main": [
+        [],
+        [{"node": "Fetch Full Message", "type": "main", "index": 0}]
+      ]
+    },
+    "Fetch Full Message": {
+      "main": [[{"node": "Unwrap Message", "type": "main", "index": 0}]]
+    },
+    "Unwrap Message": {
+      "main": [[{"node": "Direction = GUEST_TO_HOST", "type": "main", "index": 0}]]
+    },
+    "Direction = GUEST_TO_HOST": {
+      "main": [
+        [{"node": "Lookup ThreadContactMap", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Lookup ThreadContactMap": {
+      "main": [[{"node": "Contact Cached?", "type": "main", "index": 0}]]
+    },
+    "Contact Cached?": {
+      "main": [
+        [{"node": "Use Cached Contact", "type": "main", "index": 0}],
+        [{"node": "Fetch Lead by UID", "type": "main", "index": 0}]
+      ]
+    },
+    "Use Cached Contact": {
+      "main": [[{"node": "Merge Contact Paths", "type": "main", "index": 0}]]
+    },
+    "Fetch Lead by UID": {
+      "main": [[{"node": "Build Upsert Input", "type": "main", "index": 0}]]
+    },
+    "Build Upsert Input": {
+      "main": [[{"node": "Call WF-MS-3 (Contact Upsert)", "type": "main", "index": 0}]]
+    },
+    "Call WF-MS-3 (Contact Upsert)": {
+      "main": [[{"node": "Merge Contact Paths", "type": "main", "index": 1}]]
+    },
+    "Merge Contact Paths": {
+      "main": [[{"node": "Post Inbound Message to GHL", "type": "main", "index": 0}]]
+    },
+    "Post Inbound Message to GHL": {
+      "main": [[{"node": "Append MessageDedup", "type": "main", "index": 0}]]
+    },
+    "Append MessageDedup": {
+      "main": [[{"node": "Upsert ThreadContactMap", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

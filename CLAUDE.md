@@ -353,6 +353,9 @@ Never use `$json.row_number` — it is not in the Google Sheets node output.
 | `SupplyUsageLog` | `469288724` | Supply usage per booking |
 | `PayrollRecords` | `166953005` | Payroll records (one per completed job) |
 | `PayrollErrors` | `1485642013` | Payroll calculation errors for admin review |
+| `MessageDedup` | `1282682083` | Idempotency keys for messaging-sync (TTL 7d, cleaned by WF-MS-4) |
+| `ThreadContactMap` | `1241749258` | Hostfully thread UID → GHL contact ID cache |
+| `MessagingErrors` | `1322384176` | Dead-letter for failed messaging-sync attempts |
 
 When verifying workflow output, always read the relevant tab directly using MCP tools.
 Use the Spreadsheet ID above — do not ask the human for it.
@@ -386,11 +389,27 @@ Use the Spreadsheet ID above — do not ask the human for it.
 ## Workflow JSON Rules
 
 - Always include `"name"`, `"nodes"`, `"connections"`, `"settings"` at root level
-- Node IDs must be unique UUIDs — generate new ones, never copy-paste
+- Node IDs must be unique UUIDs - generate new ones, never copy-paste
 - Keep `"active": false` for all drafts until human approves
 - For Google services: use `"authentication": "oAuth2"` in node parameters
 - For webhook triggers: document the webhook URL in a Sticky Note node
 - Always add a Sticky Note node explaining what the workflow does (`n8n-nodes-base.stickyNote`)
+
+### !! Critical: Use ASCII-only characters in workflow names, node names, and sticky notes
+
+Do NOT use unicode symbols inside any workflow JSON. They render as mojibake (`â€"`, `â†'`, `â€¢`) in Windows terminals, log viewers, exported JSON, and some n8n UI fields. Stick to plain ASCII so the same content is readable everywhere.
+
+| Avoid | Use instead |
+|-------|-------------|
+| `—` (em dash) | `--` |
+| `–` (en dash) | `-` |
+| `→` `←` `↔` `⇄` (arrows) | `->` `<-` `<->` |
+| `…` (ellipsis) | `...` |
+| `⚠️` `⭐` `✅` `❌` (emoji) | `!` `*` `[OK]` `[X]` |
+| `‘ ’ “ ”` (curly quotes) | `' "` |
+| `•` (bullet) | `*` or `-` |
+
+This rule applies to: workflow `name`, node `name`, sticky note `content`, Code node comments, any string field that humans will read. Standard markdown in sticky notes (`#`, `**bold**`, tables) is fine - only the typographic unicode chars are banned.
 
 ---
 
@@ -572,6 +591,92 @@ python3 strip_workflow.py workflows/active/my-workflow.json | \
 - `assignmentCountResetDate` — date when assignmentCount was last reset
 
 > Any workflow node or expression referencing `cleanerId` is a bug — change to `fixedCleanerId`.
+
+---
+
+# PROJECT 3: MESSAGING SYNC (GHL ↔ Hostfully)
+
+## Overview
+
+Replaces HostBuddy with GoHighLevel Conversations as the AI guest-messaging layer.
+Two-way sync between Hostfully Inbox ↔ GHL Conversations.
+Full docs: `docs/messaging-sync/`
+
+## Workflows & Their IDs
+
+| ID | Workflow Name | Trigger | Status |
+|----|--------------|---------|--------|
+| `mNQZDscqiXYetCPS` | WF-MS-3 -- GHL Contact + Opportunity Upsert (sub-workflow) | Execute Workflow Trigger | Pushed (inactive) |
+| `V48NnUWti3fkXmYr` | WF-MS-1 — Hostfully → GHL Inbound | Webhook POST `/webhook/hostfully-inbox-message` | Pushed (inactive) |
+| `r5j1PIqoMKTfLGWo` | WF-MS-2 — GHL -> Hostfully Outbound (Poll) | Schedule every 2 min (polls GHL /conversations/search) | Pushed (inactive) |
+| `wW21OSK8Tqe2I1ht` | WF-MS-4 — MessageDedup Daily Cleanup | Schedule (daily 03:00 UTC) | Pushed (inactive) |
+
+> Update IDs after pushing each draft to n8n via `POST /api/v1/workflows`.
+
+## Required Credentials
+
+| Service | Credential Name in n8n | Credential ID | Status |
+|---------|------------------------|---------------|--------|
+| Hostfully | `Hostfully API` | `9KxNwfaP8qRHdRPm` | Reuse existing |
+| Google Sheets | `Google Sheets account` | `q52dbWoN6OaKRDZO` | Reuse existing |
+| GHL | `GHL API` | `PLACEHOLDER_GHL_CRED_ID` | **Create — needs PIT from David** |
+
+## Config Values (no env vars on free n8n account)
+
+> **!! IMPORTANT:** n8n environment variables (`$env.*`) are NOT available on the free/community plan.
+> Do NOT use `$env.ANYTHING` in any workflow node. It will always return undefined.
+>
+> **Pattern to use instead:** Add a Set node named `Config` early in the flow (right after the webhook trigger).
+> Hardcode all config values as named fields. Downstream nodes reference them as:
+> `$('Config').first().json.FIELD_NAME`
+>
+> The Config node must be in the execution path (connected) -- floating nodes cannot be referenced.
+
+```json
+{
+  "name": "Config",
+  "type": "n8n-nodes-base.set",
+  "parameters": {
+    "assignments": {
+      "assignments": [
+        { "name": "GHL_LOCATION_ID", "value": "RSZ3HWAGH7WnU52Zs6aW", "type": "string" },
+        { "name": "GHL_PIPELINE_ID", "value": "PLACEHOLDER_PIPELINE_ID", "type": "string" },
+        { "name": "OPP_CF_HOSTFULLY_THREAD_UID", "value": "PLACEHOLDER_OPP_CF_THREAD_UID", "type": "string" }
+      ]
+    }
+  }
+}
+```
+
+**Architecture note:** Booking-specific fields (thread UID, lead UID, property, dates, channel) are stored on
+GHL **Opportunities** (one per booking), NOT on the Contact. This solves the multi-booking overwrite problem.
+The Contact holds only name/email/phone/source.
+
+| Variable | Value / Source | Used in |
+|----------|----------------|---------|
+| `AGENCY_UID_WEBHOOK` | `35842d2f-b5c1-46fa-a33d-a12756b42ed8` | WF-MS-1 Agency Check |
+| `AGENCY_UID_API` | `35842d2f-b5c1-46fa-a33d-a12756b42ed8` | WF-MS-1, WF-MS-2 API calls |
+| `GHL_LOCATION_ID` | `RSZ3HWAGH7WnU52Zs6aW` (already known) | WF-MS-2, WF-MS-3 |
+| `GHL_PIPELINE_ID` | `5mNaQ5aMF70J8l6bVFyq` (Guest Bookings pipeline) | WF-MS-2, WF-MS-3 |
+| `GHL_STAGE_CONFIRMED` | `3150593c-e63e-4713-af6e-a8ee7d2673e4` | WF-MS-3 |
+| `GHL_STAGE_IN_STAY` | `e43e024d-954e-4f38-b51c-1397b56af9a9` | (future use) |
+| `GHL_STAGE_CHECKED_OUT` | `97b71291-f525-4428-9dad-cf8856898db6` | (future use) |
+| `OPP_CF_HOSTFULLY_LEAD_UID` | `mFOv6tOfZXQHU0nUroSQ` | WF-MS-3 |
+| `OPP_CF_HOSTFULLY_THREAD_UID` | `dzc0UzKrnbqQ4bkpVfPi` | WF-MS-2, WF-MS-3 |
+| `OPP_CF_HOSTFULLY_PROPERTY_UID` | `OcKjrX8QYH3Wy560M0S6` | WF-MS-3 |
+| `OPP_CF_RESERVATION_CHECK_IN` | `2dysIUxv0Za7Q8vGfY1J` | WF-MS-3 |
+| `OPP_CF_RESERVATION_CHECK_OUT` | `oiAofVAg35cGng46JUIp` | WF-MS-3 |
+| `OPP_CF_BOOKING_CHANNEL` | `H4sqwJ0NKQgDUiVDfXH1` | WF-MS-3 |
+
+**Contact custom fields:** Deleted from GHL UI (2026-05-14). No workflows use them.
+
+## Activation Order
+
+1. WF-MS-4 first (no GHL deps -- runs independently)
+2. WF-MS-3 next (needs GHL credential + Pipeline ID + Opportunity custom field IDs)
+3. WF-MS-1 + WF-MS-2 last (needs WF-MS-3 ready + Hostfully webhook registered)
+
+After all 4 are active and shadow-tested -> wire WF1 NEW_BOOKING path to call WF-MS-3 (Phase F in `docs/messaging-sync/implementation-plan.md`).
 
 ---
 

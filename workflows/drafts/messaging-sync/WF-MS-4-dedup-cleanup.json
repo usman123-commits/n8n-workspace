@@ -1,0 +1,201 @@
+{
+  "name": "WF-MS-4 -- MessageDedup Daily Cleanup",
+  "nodes": [
+    {
+      "id": "42f24ff3-cb0a-4b7f-8d00-7d3487fe71df",
+      "name": "Daily 03:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cf19035f-9128-48c7-8072-3c5d067efd52",
+      "name": "Read MessageDedup",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        420,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1282682083",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b9bcc745-ec97-4a9d-b26f-5cf6621cb3d9",
+      "name": "Compute Rows To Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// MessageDedup rows older than 7 days are dropped.\n// Returns batchUpdate deleteDimension requests, sorted desc so indexes don't shift mid-delete.\nconst items = $input.all();\nconst cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;\nconst SHEET_GID = 1282682083;\n\nconst toDelete = [];\nitems.forEach((item) => {\n  const row = item.json;\n  const createdAt = Date.parse(row.createdAt || '');\n  if (!Number.isFinite(createdAt)) return;\n  if (createdAt >= cutoff) return;\n  const rowNumber = row.row_number;\n  if (!Number.isFinite(rowNumber) || rowNumber < 2) return;\n  toDelete.push(rowNumber);\n});\n\ntoDelete.sort((a, b) => b - a);\n\nconst requests = toDelete.map((rn) => ({\n  deleteDimension: {\n    range: {\n      sheetId: SHEET_GID,\n      dimension: 'ROWS',\n      startIndex: rn - 1,\n      endIndex: rn\n    }\n  }\n}));\n\nreturn [{\n  json: {\n    deleteCount: requests.length,\n    requests\n  }\n}];"
+      }
+    },
+    {
+      "id": "15a46e62-c218-4d60-ac61-15ce3a40cb34",
+      "name": "Anything To Delete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        860,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "count-cond",
+              "leftValue": "={{ $json.deleteCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2bd9d4da-7bac-457b-8546-98ac86dea12b",
+      "name": "Batch Delete Rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": {{ JSON.stringify($json.requests) }}\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "ms4-sticky",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        180,
+        60
+      ],
+      "parameters": {
+        "width": 1000,
+        "height": 200,
+        "content": "## WF-MS-4 -- MessageDedup Daily Cleanup\n\n**Schedule:** every day at 03:00 UTC.\n\n**What it does:** drops rows from MessageDedup older than 7 days using a single `spreadsheets.batchUpdate` call (atomic, no index drift).\n\n**Why 7 days:** message IDs older than that won't reappear; keeping them indefinitely makes lookups slow.\n\n**No GHL deps** -- only Google Sheets credential needed, so this can run from day one."
+      }
+    }
+  ],
+  "connections": {
+    "Daily 03:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Read MessageDedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read MessageDedup": {
+      "main": [
+        [
+          {
+            "node": "Compute Rows To Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Rows To Delete": {
+      "main": [
+        [
+          {
+            "node": "Anything To Delete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything To Delete?": {
+      "main": [
+        [
+          {
+            "node": "Batch Delete Rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

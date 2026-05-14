@@ -47,10 +47,11 @@ These cannot be automated and must complete first:
 2. **GHL credentials choice — PIT or Marketplace app**
    - Recommended for v1: **PIT** (Private Integration Token) on the location. Faster, no marketplace approval. Single sub-account is fine.
    - Save as n8n credential `GHL API` (HTTP Header Auth, header `Authorization: Bearer <token>`).
-3. **Create GHL Custom Conversation Provider**
-   - Via API: `POST https://services.leadconnectorhq.com/conversations/providers/`
-   - Save the returned `conversationProviderId` in `.env` as `GHL_CONVERSATION_PROVIDER_ID`.
-   - Set its outbound webhook URL to `https://n8n.srv1566844.hstgr.cloud/webhook/ghl-outbound-message`.
+3. **~~Create GHL Custom Conversation Provider~~** -- DROPPED
+   - PIT tokens cannot create Custom Conversation Providers (requires OAuth marketplace app).
+   - **Alternative:** Register a standard GHL webhook in GHL UI (Settings -> Integrations -> Webhooks).
+   - Event: `OutboundMessage`, URL: `https://n8n.srv1566844.hstgr.cloud/webhook/ghl-outbound-message`.
+   - Inbound messages are posted as `type: "Email"` (no conversationProviderId needed).
 4. **Create GHL custom fields** (Settings → Custom Fields → Contacts)
    - `hostfully_lead_uid` (Text)
    - `hostfully_thread_uid` (Text)
@@ -133,7 +134,7 @@ Webhook → Respond 200 (immediate ACK so Hostfully doesn't retry)
             → found? use cached ghlContactId
             → not found? Fetch lead → call WF-MS-3 → cache result
         → POST to GHL: /conversations/messages/inbound
-            { type: "Custom", contactId, conversationProviderId, message, direction: "inbound", altId: <message_uid> }
+            { type: "Email", contactId, message, direction: "inbound", altId: <message_uid> }
         → Append MessageDedup row
         → Append ThreadContactMap row (or update lastSeenAt)
 ```

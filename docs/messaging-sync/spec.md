@@ -49,9 +49,9 @@ End state when working:
 
 **Two flows:**
 - **Inbound (guest → GHL):** Hostfully webhook → middleware fetches thread → middleware upserts GHL contact → middleware posts inbound message to GHL via Conversations API.
-- **Outbound (GHL → guest):** GHL "Conversation Provider Outbound Message" webhook → middleware looks up the Hostfully thread UID stored on the contact → middleware posts message to Hostfully thread → Hostfully delivers it on the right channel.
+- **Outbound (GHL → guest):** GHL OutboundMessage webhook -> middleware looks up the Hostfully thread UID stored on the contact -> middleware posts message to Hostfully thread -> Hostfully delivers it on the right channel.
 
-The pivot is GHL's **Custom Conversation Provider**. Without it, outbound replies from GHL have nowhere to go. With it, GHL fires a webhook to us every time a user (or workflow) sends a message on a contact whose default channel is "Hostfully."
+**Implementation note (2026-05):** Originally designed around GHL's Custom Conversation Provider, but PIT tokens cannot create providers (requires OAuth marketplace app). Replaced with standard GHL webhook (OutboundMessage event) + inbound messages posted as type Email. Functionally equivalent, simpler setup.
 
 ---
 
@@ -65,9 +65,10 @@ Before any code:
    - Reference: https://dev.hostfully.com/v3.0/reference/v32-messaging-update
 
 2. **GHL** (Location ID: `RSZ3HWAGH7WnU52Zs6aW`)
-   - **Option A (recommended):** Build a Marketplace app for the agency, with a Custom Conversation Provider registered. Required scopes include `conversations.write`, `conversations/message.write`, `conversations/message.readonly`, `contacts.write`, `contacts.readonly`. Reference: https://marketplace.gohighlevel.com/docs/marketplace-modules/ConversationProviders/
-   - **Option B (faster, single-location):** Private Integration Token (PIT) for the location plus a manually configured Conversation Provider via the API. Workable for one sub-account; doesn't scale if we add more brands later.
-   - Either way, capture the resulting `conversationProviderId` — every inbound message we post needs it.
+   - **Using:** Private Integration Token (PIT) for the location.
+   - Required scopes: `conversations.write`, `conversations/message.write`, `conversations/message.readonly`, `contacts.write`, `contacts.readonly`, `conversations.readonly`.
+   - ~~Custom Conversation Provider~~ -- DROPPED (PIT tokens cannot create providers; requires OAuth marketplace app).
+   - **Instead:** Register a standard GHL webhook for `OutboundMessage` event pointing to `https://n8n.srv1566844.hstgr.cloud/webhook/ghl-outbound-message`. Inbound messages posted as type `Email`.
 
 3. **Hosting for middleware**
    - Stateless HTTP service, public HTTPS endpoint, low-latency. Cloudflare Workers, AWS Lambda + API Gateway, or a small Node/Python service on Fly.io / Render — engineer's choice.
@@ -89,8 +90,9 @@ Add:
 - Optional shared-secret header on the Hostfully endpoint (Hostfully doesn't sign by default).
 - A request log + dead-letter queue.
 
-### Step 2 — Register the GHL Custom Conversation Provider
-Via the Marketplace app or API, create a conversation provider for our location. Save the returned `conversationProviderId`. Set the provider's outbound webhook URL to `https://<our-middleware>/ghl/outbound`. Decide whether to set this provider as the **default channel** for contacts created from Hostfully — yes for v1, so any reply in GHL on a Hostfully contact routes through us.
+### Step 2 — Register GHL Outbound Webhook
+~~Custom Conversation Provider~~ -- DROPPED (PIT limitation).
+Instead, register a standard GHL webhook: GHL -> Settings -> Integrations -> Webhooks -> OutboundMessage event -> URL: `https://<our-middleware>/ghl/outbound`. This fires whenever any GHL user or workflow sends a message on any contact. WF-MS-2 filters to only route messages for contacts with a Hostfully thread UID.
 
 ### Step 3 — Register Hostfully webhooks
 Register at least these event types pointing at `https://<our-middleware>/hostfully/webhook`:
@@ -125,9 +127,8 @@ Handler for `POST /hostfully/webhook` when `event_type == NEW_INBOX_MESSAGE`:
    POST https://services.leadconnectorhq.com/conversations/messages/inbound
    Authorization: Bearer <token>
    {
-     "type": "Custom",
+     "type": "Email",
      "contactId": "<ghl_contact_id>",
-     "conversationProviderId": "<our_provider_id>",
      "message": "<message_content>",
      "direction": "inbound",
      "altId": "<message_uid>"   // for idempotency
@@ -179,7 +180,12 @@ Two guards (use both):
 
 ## 6. Known gotchas
 
-- **Hostfully thread-per-reservation:** v3.2 creates a new thread per reservation, not per guest. A repeat guest will have multiple threads / multiple `hostfully_thread_uid` values over time. Decision: store the **most recent active thread UID** on the contact, plus keep a history table if we need to support replies on old reservations.
+- **Hostfully thread-per-reservation / multi-booking conflict:** v3.2 creates a new thread per reservation, not per guest. A repeat guest will have multiple threads over time. GHL collapses all bookings into one Contact Profile (matched by email/phone), so `hostfully_thread_uid` on the contact is a single field -- a new booking via WF-MS-3 overwrites the old thread UID.
+  - **Impact on inbound (WF-MS-1):** No problem -- thread UID comes directly from the Hostfully webhook payload, so inbound routing is always correct.
+  - **Impact on outbound (WF-MS-2):** Real risk -- if a guest has two overlapping active bookings (e.g. VRBO booking #1 still active, Airbnb booking #2 just created), WF-MS-2 reads the custom field and routes replies to the most recent thread, potentially to the wrong reservation.
+  - **v1 decision:** Store the most recent active thread UID on the contact. Acceptable for the common case (one active booking per guest at a time). The `ThreadContactMap` sheet retains history of all thread-to-contact mappings.
+  - **v2 fix (Phase 2):** Move per-booking fields (`hostfully_thread_uid`, check-in/out, channel) onto GHL Opportunity Cards instead of the Contact. One Opportunity per booking. WF-MS-2 looks up the active Opportunity for the contact to find the correct thread UID. This fully solves the multi-booking conflict.
+  - **Flag to David:** If a repeat guest has two simultaneous active reservations, outbound replies in GHL will route to the most recent booking's thread. Rare edge case for v1 but worth communicating.
 - **Vrbo messaging API delay:** Vrbo can take a few minutes after a new booking before the message thread is available. If we try to send outbound before that, it'll fail. Handle: retry with backoff if Hostfully returns "thread not ready."
 - **Airbnb content rules:** Airbnb strips URLs and contact info from messages on inquiries (pre-confirmation). GHL workflows generating links need to know this. Add a check: if `booking_channel == Airbnb` and `status != CONFIRMED`, sanitize URLs out of outbound messages.
 - **GHL contact dedupe:** if a guest books twice with slightly different email casing or phone formatting, we'll create duplicates. Normalize email (lowercase) and phone (E.164) before searching.
@@ -202,7 +208,7 @@ Two guards (use both):
 
 - Hostfully Messaging API v3.2: https://dev.hostfully.com/v3.0/reference/v32-messaging-update
 - Hostfully webhooks: https://dev.hostfully.com/reference/webhooks-1
-- GHL Custom Conversation Providers: https://marketplace.gohighlevel.com/docs/marketplace-modules/ConversationProviders/
+- ~~GHL Custom Conversation Providers~~ (DROPPED -- PIT limitation): https://marketplace.gohighlevel.com/docs/marketplace-modules/ConversationProviders/
 - GHL Add Inbound Message: https://marketplace.gohighlevel.com/docs/ghl/conversations/add-an-inbound-message
-- GHL Outbound Message webhook: https://marketplace.gohighlevel.com/docs/webhook/ProviderOutboundMessage
+- GHL Outbound Message webhook: https://marketplace.gohighlevel.com/docs/webhook/OutboundMessage
 - GHL webhook signature verification: https://marketplace.gohighlevel.com/docs/webhook/WebhookIntegrationGuide

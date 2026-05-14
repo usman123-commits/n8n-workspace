@@ -40,13 +40,17 @@ If a different key is required, send us the new one — we'll add it as a separa
 
 ---
 
-## 4. Create GHL Custom Conversation Provider
+## 4. ~~Create GHL Custom Conversation Provider~~ -- NOT NEEDED
 
-⚠️ **Nothing works without this.** This is what lets GHL send outbound replies back through us.
+**DROPPED.** The PIT token cannot create Custom Conversation Providers (requires OAuth marketplace app).
 
-**You do this once we have the API token from #3.** We can do it via API (give us the green light and we'll fire the call) or you can do it in the GHL UI if available for your plan.
+**Alternative (already implemented):** We use the standard GHL webhook system instead:
+- GHL -> Settings -> Integrations -> Webhooks -> Add webhook
+- Event: `OutboundMessage`
+- URL: `https://n8n.srv1566844.hstgr.cloud/webhook/ghl-outbound-message`
+- Inbound messages are posted as type `Email` (no provider ID needed)
 
-We need to capture the resulting `conversationProviderId` and store it in `.env`.
+This is simpler and fully functional. Messages appear in GHL Conversations inbox. Agent replies fire the OutboundMessage webhook which WF-MS-2 catches and forwards to Hostfully.
 
 ---
 
@@ -73,23 +77,18 @@ For shadow-mode testing (Phase G of the implementation plan), we need 1–2 low-
 
 ---
 
-## 7. Conversation Provider name
+## 7. ~~Conversation Provider name~~ -- NOT NEEDED
 
-What should the channel show as in the GHL UI? Suggestions:
-- `Hostfully`
-- `PMS Messaging`
-- `Guest Messaging`
-
-Your preference?
+Dropped along with #4. Messages appear as Email type in GHL inbox.
 
 ---
 
-## Once we have answers to 1–7
+## Once we have answers to 1–6
 
 We'll:
 1. Configure n8n credentials (add `GHL API` credential)
-2. Run the GHL provider creation API call → save the conversation provider ID
-3. Register the Hostfully `NEW_INBOX_MESSAGE` webhook
-4. Add the 3 new sheet tabs (MessageDedup, ThreadContactMap, MessagingErrors)
-5. Build and test workflows WF-MS-3, WF-MS-1, WF-MS-2 in that order
+2. Register the Hostfully `NEW_INBOX_MESSAGE` webhook
+3. Sheet tabs already created (MessageDedup, ThreadContactMap, MessagingErrors)
+4. Workflows already built (WF-MS-1, WF-MS-2, WF-MS-3, WF-MS-4) -- ready for testing
+5. Register GHL OutboundMessage webhook in GHL UI (Settings -> Integrations -> Webhooks)
 6. Hand back to you to start shadow-mode testing

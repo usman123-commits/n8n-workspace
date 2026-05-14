@@ -1,0 +1,630 @@
+{
+  "name": "WF-MS-2 -- GHL -> Hostfully Outbound (Poll)",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-a000-000000000001",
+      "name": "Poll Every 2 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 400],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0002-4000-a000-000000000002",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-agency-api",
+              "name": "AGENCY_UID_API",
+              "value": "35842d2f-b5c1-46fa-a33d-a12756b42ed8",
+              "type": "string"
+            },
+            {
+              "id": "cfg-pipeline",
+              "name": "GHL_PIPELINE_ID",
+              "value": "5mNaQ5aMF70J8l6bVFyq",
+              "type": "string"
+            },
+            {
+              "id": "cfg-thread-cf",
+              "name": "OPP_CF_HOSTFULLY_THREAD_UID",
+              "value": "dzc0UzKrnbqQ4bkpVfPi",
+              "type": "string"
+            },
+            {
+              "id": "cfg-location",
+              "name": "GHL_LOCATION_ID",
+              "value": "RSZ3HWAGH7WnU52Zs6aW",
+              "type": "string"
+            },
+            {
+              "id": "cfg-lookback",
+              "name": "LOOKBACK_SECONDS",
+              "value": 180,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-4000-a000-000000000003",
+      "name": "Build Poll Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 400],
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst lookbackMs = (cfg.LOOKBACK_SECONDS || 180) * 1000;\nconst nowMs = Date.now();\nconst startMs = nowMs - lookbackMs;\nreturn [{\n  json: {\n    startAfterDateMs: startMs,\n    startAfterDateISO: new Date(startMs).toISOString(),\n    nowISO: new Date(nowMs).toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0004-4000-a000-000000000004",
+      "name": "Get Recent Conversations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "GET",
+        "url": "https://services.leadconnectorhq.com/conversations/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "locationId",
+              "value": "={{ $('Config').first().json.GHL_LOCATION_ID }}"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0005-4000-a000-000000000005",
+      "name": "Split Conversations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 400],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst conversations = data.conversations || [];\nif (conversations.length === 0) return [];\nreturn conversations.map(conv => ({\n  json: {\n    conversationId: conv.id,\n    contactId: conv.contactId,\n    lastMessageDate: conv.lastMessageDate || conv.dateUpdated || ''\n  }\n}));"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0006-4000-a000-000000000006",
+      "name": "Get Conversation Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://services.leadconnectorhq.com/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "10"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0007-4000-a000-000000000007",
+      "name": "Filter Outbound Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 400],
+      "parameters": {
+        "jsCode": "// GHL messages endpoint returns: { messages: { lastMessageId, nextPage, messages: [...] } }\n// The array is nested at response.messages.messages\nconst cutoffISO = $('Build Poll Window').first().json.startAfterDateISO;\nconst cutoff = new Date(cutoffISO).getTime();\nconst results = [];\n\nfor (const item of $input.all()) {\n  const outer = item.json.messages || {};\n  // Handle both shapes just in case: direct array or nested under .messages\n  const messages = Array.isArray(outer) ? outer : (outer.messages || []);\n\n  for (const msg of messages) {\n    const rawDate = msg.dateAdded || msg.createdAt || '';\n    const msgTime = rawDate ? new Date(rawDate).getTime() : 0;\n    const direction = (msg.direction || '').toLowerCase();\n    if (direction === 'outbound' && msgTime >= cutoff) {\n      results.push({\n        json: {\n          ghlMessageId: msg.id || '',\n          ghlContactId: msg.contactId || '',\n          conversationId: msg.conversationId || '',\n          messageBody: msg.body || msg.message || '',\n          dateAdded: rawDate,\n          messageKey: 'ghl:' + (msg.id || '')\n        }\n      });\n    }\n  }\n}\n\nreturn results;"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0008-4000-a000-000000000008",
+      "name": "Lookup MessageDedup",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1740, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1282682083",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "messageKey",
+              "lookupValue": "={{ $json.messageKey }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": false
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a1b2c3d4-0009-4000-a000-000000000009",
+      "name": "Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1960, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dedup-cond",
+              "leftValue": "={{ String($json.messageKey || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-000a-4000-a000-000000000010",
+      "name": "Search Contact Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2180, 520],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://services.leadconnectorhq.com/opportunities/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "location_id",
+              "value": "={{ $('Config').first().json.GHL_LOCATION_ID }}"
+            },
+            {
+              "name": "contact_id",
+              "value": "={{ $('Filter Outbound Messages').item.json.ghlContactId }}"
+            },
+            {
+              "name": "pipeline_id",
+              "value": "={{ $('Config').first().json.GHL_PIPELINE_ID }}"
+            },
+            {
+              "name": "status",
+              "value": "open"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-000b-4000-a000-000000000011",
+      "name": "Extract Thread UID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 520],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst opportunities = raw.opportunities || raw.data || [];\n\nif (opportunities.length === 0) {\n  // No open Hostfully opportunities for this contact -- skip silently\n  return [];\n}\n\n// Pick the most recently created open opportunity (last booking)\nconst opp = opportunities[0];\nconst customFields = opp.customFields || [];\n\nconst threadFieldId = $('Config').first().json.OPP_CF_HOSTFULLY_THREAD_UID;\nif (!threadFieldId || threadFieldId.startsWith('PLACEHOLDER')) {\n  return [];\n}\n\nlet threadUid = '';\nfor (const cf of customFields) {\n  if ((cf.id || cf.fieldId) === threadFieldId) {\n    threadUid = cf.value || cf.field_value || cf.fieldValue || '';\n    break;\n  }\n}\n\nif (!threadUid) {\n  return [];\n}\n\nconst srcMsg = $('Filter Outbound Messages').item.json;\n\nreturn [{\n  json: {\n    threadUid,\n    ghlContactId: srcMsg.ghlContactId,\n    ghlOpportunityId: opp.id || '',\n    ghlMessageId: srcMsg.ghlMessageId,\n    messageKey: srcMsg.messageKey,\n    messageBody: srcMsg.messageBody\n  }\n}];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-000c-4000-a000-000000000012",
+      "name": "Send to Hostfully Thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, 520],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9KxNwfaP8qRHdRPm",
+          "name": "Hostfully API"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://platform.hostfully.com/api/v3.2/threads/{{ $json.threadUid }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "agencyUid",
+              "value": "={{ $('Config').first().json.AGENCY_UID_API }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"{{ $json.messageBody.replace(/\\\\/g,'\\\\\\\\').replace(/\"/g,'\\\\\"').replace(/\\n/g,'\\\\n') }}\",\n  \"sendVia\": \"AUTO\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "a1b2c3d4-000d-4000-a000-000000000013",
+      "name": "Send Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2840, 520],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ok-cond",
+              "leftValue": "={{ Number($json.statusCode || 200) }}",
+              "rightValue": 299,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-000e-4000-a000-000000000014",
+      "name": "Append MessageDedup",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3060, 420],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1282682083",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "messageKey": "={{ $('Extract Thread UID').item.json.messageKey }}",
+            "direction": "outbound",
+            "createdAt": "={{ new Date().toISOString() }}"
+          },
+          "schema": [
+            {"id": "messageKey", "displayName": "messageKey", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "direction", "displayName": "direction", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "createdAt", "displayName": "createdAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-000f-4000-a000-000000000015",
+      "name": "Mark GHL Delivered",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3060, 580],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VwJj55d4veBRjPmF",
+          "name": "GHL Credentails"
+        }
+      },
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://services.leadconnectorhq.com/conversations/messages/{{ $('Extract Thread UID').item.json.ghlMessageId }}/status",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-04-15"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"delivered\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0010-4000-a000-000000000016",
+      "name": "Log to MessagingErrors",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3060, 680],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1q6LUdIogNrE6krKhA0HcK9iWT7yaV5MiWDeAFEkl6kw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1322384176",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "direction": "outbound",
+            "errorMessage": "=Hostfully send failed (status {{ $('Send to Hostfully Thread').first().json.statusCode }}): {{ JSON.stringify($('Send to Hostfully Thread').first().json.body || {}).slice(0, 500) }}",
+            "payload": "={{ JSON.stringify($('Extract Thread UID').item.json || {}).slice(0, 2000) }}",
+            "createdAt": "={{ new Date().toISOString() }}"
+          },
+          "schema": [
+            {"id": "direction", "displayName": "direction", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "errorMessage", "displayName": "errorMessage", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "payload", "displayName": "payload", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true},
+            {"id": "createdAt", "displayName": "createdAt", "type": "string", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0011-4000-a000-000000000017",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 60],
+      "parameters": {
+        "width": 1400,
+        "height": 260,
+        "content": "## WF-MS-2 -- GHL -> Hostfully Outbound (Poll Mode)\n\n**Trigger:** Schedule every 2 minutes (polls GHL for recent outbound messages)\n**Why poll?** GHL does not expose a free OutboundMessage webhook via API or PIT tokens.\nThe paid GHL Automation trigger (Option A) or a Marketplace App (Option C) would enable real-time push.\n\n**Flow:** Poll window (last 3 min) -> GET /conversations/search (50 most recent) -> per conversation: GET messages -> filter outbound + recent -> MessageDedup check -> Search Opportunities for contact -> extract hostfully_thread_uid from active Opportunity -> POST to Hostfully thread -> on success: append dedup + mark GHL delivered; on failure: log to MessagingErrors.\n\n**Multi-booking safe:** Uses Opportunities (not contact custom fields) so each booking has its own thread UID.\n\n**Config IDs:**\n- Pipeline: 5mNaQ5aMF70J8l6bVFyq | Thread UID field: dzc0UzKrnbqQ4bkpVfPi\n- GHL credential is already set (VwJj55d4veBRjPmF)."
+      }
+    },
+    {
+      "id": "a1b2c3d4-0012-4000-a000-000000000018",
+      "name": "Scale and Limits",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 360],
+      "parameters": {
+        "width": 500,
+        "height": 380,
+        "color": 3,
+        "content": "## Scale -- Are We Safe?\n\nYes, at David's current size. Here is why:\n\n**50 conversations per poll**\nWe grab the 50 most recently active conversations each run. David has maybe 10-30 active bookings at any time, so we always catch everything. This would only become a problem if 50+ guests all messaged within the same 2-minute window -- basically impossible in a small STR operation.\n\n**10 messages per conversation**\nWe read the last 10 messages from each thread. In practice, an agent reply is 1-2 messages at a time. You would need to send 10+ messages to the same guest in under 2 minutes for one to slip through -- not a real scenario.\n\n**2-minute delay**\nReplies from GHL reach the guest within ~2 minutes (not instant). Fine for normal back-and-forth. If this ever feels too slow, upgrading to Option A (paid GHL trigger) drops it to near-instant.\n\n**When would limits actually matter?**\nIf the operation scaled to 100+ properties with constant guest messaging, or if automated GHL workflows fire dozens of messages per minute. At that point, switch to Option A or build a Marketplace App."
+      }
+    }
+  ],
+  "connections": {
+    "Poll Every 2 Minutes": {
+      "main": [[{"node": "Config", "type": "main", "index": 0}]]
+    },
+    "Config": {
+      "main": [[{"node": "Build Poll Window", "type": "main", "index": 0}]]
+    },
+    "Build Poll Window": {
+      "main": [[{"node": "Get Recent Conversations", "type": "main", "index": 0}]]
+    },
+    "Get Recent Conversations": {
+      "main": [[{"node": "Split Conversations", "type": "main", "index": 0}]]
+    },
+    "Split Conversations": {
+      "main": [[{"node": "Get Conversation Messages", "type": "main", "index": 0}]]
+    },
+    "Get Conversation Messages": {
+      "main": [[{"node": "Filter Outbound Messages", "type": "main", "index": 0}]]
+    },
+    "Filter Outbound Messages": {
+      "main": [[{"node": "Lookup MessageDedup", "type": "main", "index": 0}]]
+    },
+    "Lookup MessageDedup": {
+      "main": [[{"node": "Already Processed?", "type": "main", "index": 0}]]
+    },
+    "Already Processed?": {
+      "main": [
+        [],
+        [{"node": "Search Contact Opportunities", "type": "main", "index": 0}]
+      ]
+    },
+    "Search Contact Opportunities": {
+      "main": [[{"node": "Extract Thread UID", "type": "main", "index": 0}]]
+    },
+    "Extract Thread UID": {
+      "main": [[{"node": "Send to Hostfully Thread", "type": "main", "index": 0}]]
+    },
+    "Send to Hostfully Thread": {
+      "main": [[{"node": "Send Succeeded?", "type": "main", "index": 0}]]
+    },
+    "Send Succeeded?": {
+      "main": [
+        [
+          {"node": "Append MessageDedup", "type": "main", "index": 0},
+          {"node": "Mark GHL Delivered", "type": "main", "index": 0}
+        ],
+        [{"node": "Log to MessagingErrors", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
