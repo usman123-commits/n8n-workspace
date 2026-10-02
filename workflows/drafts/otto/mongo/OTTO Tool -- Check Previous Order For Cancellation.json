@@ -30,7 +30,7 @@
           "limit": 1
         }
       },
-      "id": "f1708f6e-d283-4387-bbad-7fe188a8a836",
+      "id": "2af5f102-531e-4fe4-97cc-f96adb264a53",
       "name": "Read Orders By Phone",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -40,7 +40,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -135,7 +135,7 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "50e3ff10-f4bc-4670-a521-bd31cd751f2c",
+      "id": "287ca6d3-300a-49bc-bb32-f51d227925ba",
       "name": "Append Pending Cancellation Row",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -145,7 +145,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -194,7 +194,7 @@
       "parameters": {
         "jsCode": "// Data source: $json = output of 'Is Actionable? (status = preparing)' (pass-through of 'Pick Most Recent Order')\n//   -> phone, orderId, items (array), total, address, status\nconst o = $json;\nconst total = Number(o.total);\n\nreturn [{ json: {\n  phone: String(o.phone),\n  orderId: o.orderId,\n  items: o.items,\n  total: isFinite(total) ? total : String(o.total),\n  address: o.address || '',\n  status: o.status,\n  timestamp: new Date().toISOString(),\n  awaitingConfirmation: true,\n  workflowName: $workflow.name,\n  workflowId: $workflow.id,\n  executionId: $execution.id\n} }];"
       },
-      "id": "c9ac8282-c241-4b44-9860-1639d4d1df2f",
+      "id": "48860e8d-4c2e-4e8a-88dc-8aa2f717799b",
       "name": "Build Pending Cancellation Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

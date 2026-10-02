@@ -22,7 +22,7 @@
           "limit": 1
         }
       },
-      "id": "c959d1e5-acce-476e-a8e5-4abf8f1b296d",
+      "id": "ba8df3d4-b2bd-4687-8cee-79d6d2ff4ada",
       "name": "Fetch Orders",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -32,7 +32,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },

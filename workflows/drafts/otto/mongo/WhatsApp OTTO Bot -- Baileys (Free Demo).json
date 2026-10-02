@@ -104,7 +104,7 @@
         "query": "{}",
         "options": {}
       },
-      "id": "f26d3db7-c9af-4b9e-a2c2-3bc53af90f7f",
+      "id": "c0ed6006-3a8a-4308-9dc5-21aa075100b3",
       "name": "Read Bot Config",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -114,7 +114,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -273,7 +273,7 @@
           "limit": 1
         }
       },
-      "id": "535ba3f1-27f0-4003-9550-a5a560cd57e2",
+      "id": "00f76f82-bcf2-4060-a1e5-14c589584967",
       "name": "Check Handoff",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -283,7 +283,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -376,7 +376,7 @@
         "upsert": true,
         "options": {}
       },
-      "id": "3e4096e7-3368-4410-8acb-982c6031e2f1",
+      "id": "35f05489-405f-45df-bdbb-849fa5ec6149",
       "name": "Update Spend",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -386,7 +386,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -434,7 +434,7 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "518ff844-fd38-4a7d-a793-0171de93bdda",
+      "id": "83df3616-a372-4025-a7dd-21690e3b8502",
       "name": "Append Order",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -444,7 +444,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -511,7 +511,7 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "048eeecb-0e76-4c2c-b134-72afd0368ae9",
+      "id": "67853353-ba82-4b79-ade4-187bb63073cf",
       "name": "Log Handoff",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -521,7 +521,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -741,7 +741,7 @@
           "limit": 1
         }
       },
-      "id": "0bc98fb6-9405-430b-b185-9177f555ac1f",
+      "id": "a74bcd50-ef41-4ccc-973b-1e4159f1c53d",
       "name": "Check Pending Confirmation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -751,7 +751,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -814,7 +814,7 @@
           "limit": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}"
         }
       },
-      "id": "3e3882e1-105c-49ca-abd5-8262921de0ba",
+      "id": "c13ad8c8-60d4-44b3-b292-8d15808ae375",
       "name": "Fetch History (For Confirmation)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -824,7 +824,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       }
@@ -936,7 +936,7 @@
         "upsert": false,
         "options": {}
       },
-      "id": "16ffc6bf-aa9e-4b48-a8c0-ae070ccf73ff",
+      "id": "c30a2094-436a-4efc-bede-d55518932c5e",
       "name": "Clear Pending Flag (Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -946,7 +946,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -962,7 +962,7 @@
         "upsert": false,
         "options": {}
       },
-      "id": "0add4395-333b-4923-9664-14ca5efb69f6",
+      "id": "94b45eb3-c930-4dc8-b1ea-5f5c22f0b7d6",
       "name": "Clear Pending Flag (Not Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -972,7 +972,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1080,7 +1080,7 @@
         "upsert": false,
         "options": {}
       },
-      "id": "755f9af2-261f-430b-8198-d3886d1f1c18",
+      "id": "7f9f8b16-b806-4dd1-ac97-a847b7d06b62",
       "name": "Clear Pending Flag (Expired)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1090,7 +1090,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1107,7 +1107,7 @@
           "limit": 1
         }
       },
-      "id": "ccb2e7d5-9e95-4607-9856-104c4ac82177",
+      "id": "c5aae635-3865-4083-b244-5b6f0221a95f",
       "name": "Check Pending Cancellation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1117,7 +1117,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1180,7 +1180,7 @@
           "limit": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}"
         }
       },
-      "id": "43ddee6a-231b-4c0c-b983-6f9e50b53f1f",
+      "id": "8c044743-6ba9-4838-aecf-1e9c18f8fe4d",
       "name": "Fetch History (For Cancellation)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1190,7 +1190,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       }
@@ -1335,7 +1335,7 @@
         "upsert": false,
         "options": {}
       },
-      "id": "cf34ba8f-275a-4a76-bbe6-a00ed2d1598a",
+      "id": "ba488c6e-b660-4bdd-92af-370e0b8c0065",
       "name": "Clear Pending Cancellation Flag (Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1345,7 +1345,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1361,7 +1361,7 @@
         "upsert": false,
         "options": {}
       },
-      "id": "8cae72ed-a8c6-4b35-856b-507f5d4509dc",
+      "id": "b42266ec-a4b8-4a6f-b887-5e7b31bdbcca",
       "name": "Clear Pending Cancellation Flag (Not Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1371,7 +1371,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1387,7 +1387,7 @@
         "upsert": false,
         "options": {}
       },
-      "id": "e001137f-06df-403d-a788-f7d25f7061f1",
+      "id": "8baf505b-d3ab-486c-8b8c-8186a72867cb",
       "name": "Clear Pending Cancellation Flag (Expired)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1397,7 +1397,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1574,7 +1574,7 @@
       "parameters": {
         "jsCode": "// Data sources:\n//   $('Extract Message').first().json -> phone, profileName, messageBody, timestamp, sessionDate\n//   $('Process Reply').first().json   -> aiReply\n// Output: 2 items (user message, assistant reply) shaped like the Conversation collection.\nconst m = $('Extract Message').first().json;\nconst reply = $('Process Reply').first().json;\n\nfunction toIso(ts) {\n  if (typeof ts === 'number' || /^\\d+$/.test(String(ts || ''))) {\n    const n = Number(ts);\n    const d = new Date(n < 1e12 ? n * 1000 : n);\n    if (!isNaN(d)) return d.toISOString();\n  }\n  const d = new Date(ts);\n  return isNaN(d) ? new Date().toISOString() : d.toISOString();\n}\n\nreturn [\n  { json: {\n      phone: m.phone,\n      profileName: m.profileName,\n      message: m.messageBody,\n      role: 'user',\n      timestamp: toIso(m.timestamp),\n      sessionId: m.sessionDate\n  } },\n  { json: {\n      phone: m.phone,\n      profileName: 'BOT',\n      message: reply.aiReply,\n      role: 'assistant',\n      timestamp: new Date().toISOString(),\n      sessionId: m.sessionDate\n  } }\n];"
       },
-      "id": "fddd1a13-f9ec-415f-aada-9a13bcc60710",
+      "id": "6b3a7c92-fc5c-4609-b573-51662f69f927",
       "name": "Build Conversation Docs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1592,7 +1592,7 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "81e40f86-e3bb-450b-8f03-94f8547fdfde",
+      "id": "b2ed34fe-8511-4afd-bbfb-066f7f550118",
       "name": "Log Conversation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1602,7 +1602,7 @@
       ],
       "credentials": {
         "mongoDb": {
-          "id": "MONGO_CRED_ID",
+          "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
@@ -1612,7 +1612,7 @@
       "parameters": {
         "jsCode": "function normalizeItems(raw) {\n  let arr = raw;\n  if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (e) { arr = []; } }\n  if (!Array.isArray(arr)) arr = [];\n  return arr.filter(i => i && i.name).map(i => {\n    const out = { name: String(i.name), qty: Number(i.qty || 1) };\n    const price = Number(i.price);\n    if (i.price !== undefined && i.price !== null && i.price !== '' && isFinite(price)) out.price = price;\n    return out;\n  });\n}\n\n// Data sources:\n//   $('Extract Message').first().json -> phone, profileName, jid\n//   $('Process Reply').first().json.orderData -> items, total, address (from the <<<ORDER:...>>> tag)\nconst m = $('Extract Message').first().json;\nconst od = $('Process Reply').first().json.orderData || {};\nconst total = Number(od.total);\n\nreturn [{ json: {\n  orderId: 'OTTO-' + Date.now(),\n  timestamp: new Date().toISOString(),\n  phone: m.phone,\n  profileName: m.profileName,\n  items: normalizeItems(od.items),\n  totalAmount: isFinite(total) ? total : 0,\n  deliveryAddress: od.address || '',\n  status: 'preparing',\n  notes: '',\n  jid: m.jid\n} }];"
       },
-      "id": "c9e14919-6787-4d91-8c42-461776c635f9",
+      "id": "d3d3559e-415f-4cec-949b-173fddd60d54",
       "name": "Build Order Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1625,7 +1625,7 @@
       "parameters": {
         "jsCode": "// Data sources:\n//   $('Extract Message').first().json -> phone, profileName, messageBody\n//   $('Process Reply').first().json.handoffData -> reason (from the <<<HANDOFF:...>>> tag)\nconst m = $('Extract Message').first().json;\nconst h = $('Process Reply').first().json.handoffData || {};\n\nreturn [{ json: {\n  timestamp: new Date().toISOString(),\n  phone: m.phone,\n  profileName: m.profileName,\n  reason: h.reason || '',\n  lastMessage: m.messageBody,\n  status: 'active'\n} }];"
       },
-      "id": "9da68650-b74d-48a6-bbf8-7cd7416effe1",
+      "id": "e7fee551-d3de-4d4a-b40f-2ad10bccdb1f",
       "name": "Build Handoff Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
