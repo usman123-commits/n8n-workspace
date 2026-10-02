@@ -99,12 +99,10 @@
     },
     {
       "parameters": {
-        "operation": "find",
         "collection": "botconfigs",
-        "query": "{}",
         "options": {}
       },
-      "id": "9ae1256f-610a-48e2-8fee-8bedfd728bcb",
+      "id": "c0ed6006-3a8a-4308-9dc5-21aa075100b3",
       "name": "Read Bot Config",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -112,13 +110,13 @@
         36208,
         2096
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -265,15 +263,14 @@
     },
     {
       "parameters": {
-        "operation": "find",
         "collection": "handoffs",
-        "query": "={{ JSON.stringify({ phone: $json.phone }) }}",
         "options": {
-          "sort": "{\"timestamp\": -1}",
-          "limit": 1
-        }
+          "limit": 1,
+          "sort": "{\"timestamp\": -1}"
+        },
+        "query": "={{ JSON.stringify({ phone: $json.phone }) }}"
       },
-      "id": "cb15b6ad-80c4-4f51-b687-16498bef3f96",
+      "id": "00f76f82-bcf2-4060-a1e5-14c589584967",
       "name": "Check Handoff",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -281,13 +278,13 @@
         37776,
         2096
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -376,7 +373,7 @@
         "upsert": true,
         "options": {}
       },
-      "id": "b56bf201-a32c-4267-a4b9-84b07faed24c",
+      "id": "35f05489-405f-45df-bdbb-849fa5ec6149",
       "name": "Update Spend",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -434,12 +431,12 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "38162aa8-1c39-4181-b444-d8bd558c632a",
+      "id": "83df3616-a372-4025-a7dd-21690e3b8502",
       "name": "Append Order",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
       "position": [
-        46272,
+        46496,
         1968
       ],
       "credentials": {
@@ -464,7 +461,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        46496,
+        46720,
         1968
       ],
       "onError": "continueRegularOutput"
@@ -511,12 +508,12 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "6aeeaac3-bac4-41e4-8b67-4860f83717c8",
+      "id": "67853353-ba82-4b79-ade4-187bb63073cf",
       "name": "Log Handoff",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
       "position": [
-        46272,
+        46496,
         2256
       ],
       "credentials": {
@@ -533,7 +530,7 @@
         "url": "={{ $('Config').first().json.BRIDGE_URL + '/send' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ to: $('Config').first().json.OWNER_JID, message: 'HANDOFF NEEDED -- OTTO\\n\\nCustomer: ' + $('Extract Message').first().json.profileName + '\\nPhone: ' + $('Extract Message').first().json.phone + '\\nReason: ' + ($('Process Reply').first().json.handoffData?.reason || 'unknown') + '\\nLast message: ' + $('Extract Message').first().json.messageBody + '\\n\\nBot is SILENT for this number. Set status to resolved in the handoffs collection to re-enable.' }) }}",
+        "jsonBody": "={{ JSON.stringify({ to: $('Config').first().json.OWNER_JID, message: 'HANDOFF NEEDED -- OTTO\\n\\nCustomer: ' + $('Extract Message').first().json.profileName + '\\nPhone: ' + $('Extract Message').first().json.phone + '\\nReason: ' + ($('Process Reply').first().json.handoffData?.reason || 'unknown') + '\\nLast message: ' + $('Extract Message').first().json.messageBody + '\\n\\nBot is SILENT for this number. Set status to resolved in the Handoff collection to re-enable.' }) }}",
         "options": {}
       },
       "id": "59a6ffb0-40a8-4ec3-ae49-cfeb87649ad6",
@@ -541,7 +538,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        46496,
+        46720,
         2256
       ],
       "onError": "continueRegularOutput"
@@ -565,7 +562,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        46720,
+        46944,
         2192
       ]
     },
@@ -733,15 +730,14 @@
     },
     {
       "parameters": {
-        "operation": "find",
         "collection": "pendingConfirmations",
-        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone, awaitingConfirmation: true }) }}",
         "options": {
-          "sort": "{\"timestamp\": -1}",
-          "limit": 1
-        }
+          "limit": 1,
+          "sort": "{\"timestamp\": -1}"
+        },
+        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone, awaitingConfirmation: true }) }}"
       },
-      "id": "2f64a8d9-f100-4e12-b3ac-5f207ba3eb9f",
+      "id": "a74bcd50-ef41-4ccc-973b-1e4159f1c53d",
       "name": "Check Pending Confirmation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -749,13 +745,13 @@
         38448,
         2096
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -806,15 +802,14 @@
     },
     {
       "parameters": {
-        "operation": "find",
         "collection": "conversations",
-        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone }) }}",
         "options": {
-          "sort": "{\"timestamp\": -1}",
-          "limit": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}"
-        }
+          "limit": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}",
+          "sort": "{\"timestamp\": -1}"
+        },
+        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone }) }}"
       },
-      "id": "ca53f35f-a594-4972-a373-d2596434f558",
+      "id": "c13ad8c8-60d4-44b3-b292-8d15808ae375",
       "name": "Fetch History (For Confirmation)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -933,10 +928,9 @@
         "collection": "pendingConfirmations",
         "updateKey": "_id",
         "fields": "awaitingConfirmation",
-        "upsert": false,
         "options": {}
       },
-      "id": "c1d57018-4ae9-4a67-a057-e5653a7a5bf9",
+      "id": "c30a2094-436a-4efc-bede-d55518932c5e",
       "name": "Clear Pending Flag (Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -944,13 +938,13 @@
         43184,
         2512
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -959,10 +953,9 @@
         "collection": "pendingConfirmations",
         "updateKey": "_id",
         "fields": "awaitingConfirmation",
-        "upsert": false,
         "options": {}
       },
-      "id": "010f7fc1-15d9-474c-9672-bfa3a19ec258",
+      "id": "94b45eb3-c930-4dc8-b1ea-5f5c22f0b7d6",
       "name": "Clear Pending Flag (Not Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -970,13 +963,13 @@
         40592,
         1856
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -1077,10 +1070,9 @@
         "collection": "pendingConfirmations",
         "updateKey": "_id",
         "fields": "awaitingConfirmation",
-        "upsert": false,
         "options": {}
       },
-      "id": "163b15f5-2206-4f6d-b4ef-a43d5493a0ed",
+      "id": "7f9f8b16-b806-4dd1-ac97-a847b7d06b62",
       "name": "Clear Pending Flag (Expired)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1088,26 +1080,25 @@
         40592,
         2768
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "operation": "find",
         "collection": "pendingCancellations",
-        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone, awaitingConfirmation: true }) }}",
         "options": {
-          "sort": "{\"timestamp\": -1}",
-          "limit": 1
-        }
+          "limit": 1,
+          "sort": "{\"timestamp\": -1}"
+        },
+        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone, awaitingConfirmation: true }) }}"
       },
-      "id": "bab55b38-bf0c-47c1-bd90-e56a0c79b4cd",
+      "id": "c5aae635-3865-4083-b244-5b6f0221a95f",
       "name": "Check Pending Cancellation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1115,13 +1106,13 @@
         40816,
         1856
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -1172,15 +1163,14 @@
     },
     {
       "parameters": {
-        "operation": "find",
         "collection": "conversations",
-        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone }) }}",
         "options": {
-          "sort": "{\"timestamp\": -1}",
-          "limit": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}"
-        }
+          "limit": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}",
+          "sort": "{\"timestamp\": -1}"
+        },
+        "query": "={{ JSON.stringify({ phone: $('Extract Message').first().json.phone }) }}"
       },
-      "id": "09f767e9-9b23-4353-9398-444175e48b3e",
+      "id": "8c044743-6ba9-4838-aecf-1e9c18f8fe4d",
       "name": "Fetch History (For Cancellation)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1332,10 +1322,9 @@
         "collection": "pendingCancellations",
         "updateKey": "_id",
         "fields": "awaitingConfirmation",
-        "upsert": false,
         "options": {}
       },
-      "id": "584aedff-50cc-40d0-ab2f-e1fa10981e8f",
+      "id": "ba488c6e-b660-4bdd-92af-370e0b8c0065",
       "name": "Clear Pending Cancellation Flag (Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1343,13 +1332,13 @@
         43184,
         2192
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -1358,10 +1347,9 @@
         "collection": "pendingCancellations",
         "updateKey": "_id",
         "fields": "awaitingConfirmation",
-        "upsert": false,
         "options": {}
       },
-      "id": "7851f28c-d351-4542-8252-02319ad94a68",
+      "id": "b42266ec-a4b8-4a6f-b887-5e7b31bdbcca",
       "name": "Clear Pending Cancellation Flag (Not Confirmed)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1369,13 +1357,13 @@
         42960,
         1856
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -1384,10 +1372,9 @@
         "collection": "pendingCancellations",
         "updateKey": "_id",
         "fields": "awaitingConfirmation",
-        "upsert": false,
         "options": {}
       },
-      "id": "115a32e6-c642-4a21-be3f-a6a0d4b992dc",
+      "id": "8baf505b-d3ab-486c-8b8c-8186a72867cb",
       "name": "Clear Pending Cancellation Flag (Expired)",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -1395,13 +1382,13 @@
         42960,
         2368
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "mongoDb": {
           "id": "uZpESJ63i7vkqPjK",
           "name": "MongoDB account"
         }
       },
-      "alwaysOutputData": true,
       "onError": "continueRegularOutput"
     },
     {
@@ -1550,7 +1537,7 @@
     },
     {
       "parameters": {
-        "model": "~anthropic/claude-haiku-latest",
+        "model": "anthropic/claude-haiku-4.5",
         "options": {
           "temperature": 0
         }
@@ -1574,12 +1561,12 @@
       "parameters": {
         "jsCode": "// Data sources:\n//   $('Extract Message').first().json -> phone, profileName, messageBody, timestamp, sessionDate\n//   $('Process Reply').first().json   -> aiReply\n// Output: 2 items (user message, assistant reply) shaped like the Conversation collection.\nconst m = $('Extract Message').first().json;\nconst reply = $('Process Reply').first().json;\n\nfunction toIso(ts) {\n  if (typeof ts === 'number' || /^\\d+$/.test(String(ts || ''))) {\n    const n = Number(ts);\n    const d = new Date(n < 1e12 ? n * 1000 : n);\n    if (!isNaN(d)) return d.toISOString();\n  }\n  const d = new Date(ts);\n  return isNaN(d) ? new Date().toISOString() : d.toISOString();\n}\n\nreturn [\n  { json: {\n      phone: m.phone,\n      profileName: m.profileName,\n      message: m.messageBody,\n      role: 'user',\n      timestamp: toIso(m.timestamp),\n      sessionId: m.sessionDate\n  } },\n  { json: {\n      phone: m.phone,\n      profileName: 'BOT',\n      message: reply.aiReply,\n      role: 'assistant',\n      timestamp: new Date().toISOString(),\n      sessionId: m.sessionDate\n  } }\n];"
       },
-      "id": "b1f088e6-fc2c-4cdf-8a72-795bd8de3629",
+      "id": "6b3a7c92-fc5c-4609-b573-51662f69f927",
       "name": "Build Conversation Docs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        44480,
+        44704,
         2208
       ]
     },
@@ -1592,12 +1579,12 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "e118decc-d0bb-4299-9854-d6e7390b4e15",
+      "id": "b2ed34fe-8511-4afd-bbfb-066f7f550118",
       "name": "Log Conversation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
       "position": [
-        44704,
+        44928,
         2208
       ],
       "credentials": {
@@ -1612,26 +1599,26 @@
       "parameters": {
         "jsCode": "function normalizeItems(raw) {\n  let arr = raw;\n  if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (e) { arr = []; } }\n  if (!Array.isArray(arr)) arr = [];\n  return arr.filter(i => i && i.name).map(i => {\n    const out = { name: String(i.name), qty: Number(i.qty || 1) };\n    const price = Number(i.price);\n    if (i.price !== undefined && i.price !== null && i.price !== '' && isFinite(price)) out.price = price;\n    return out;\n  });\n}\n\n// Data sources:\n//   $('Extract Message').first().json -> phone, profileName, jid\n//   $('Process Reply').first().json.orderData -> items, total, address (from the <<<ORDER:...>>> tag)\nconst m = $('Extract Message').first().json;\nconst od = $('Process Reply').first().json.orderData || {};\nconst total = Number(od.total);\n\nreturn [{ json: {\n  orderId: 'OTTO-' + Date.now(),\n  timestamp: new Date().toISOString(),\n  phone: m.phone,\n  profileName: m.profileName,\n  items: normalizeItems(od.items),\n  totalAmount: isFinite(total) ? total : 0,\n  deliveryAddress: od.address || '',\n  status: 'preparing',\n  notes: '',\n  jid: m.jid\n} }];"
       },
-      "id": "2c0bf8b6-6678-46c3-b9de-28183c22c8d9",
+      "id": "d3d3559e-415f-4cec-949b-173fddd60d54",
       "name": "Build Order Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         46272,
-        2138
+        1968
       ]
     },
     {
       "parameters": {
         "jsCode": "// Data sources:\n//   $('Extract Message').first().json -> phone, profileName, messageBody\n//   $('Process Reply').first().json.handoffData -> reason (from the <<<HANDOFF:...>>> tag)\nconst m = $('Extract Message').first().json;\nconst h = $('Process Reply').first().json.handoffData || {};\n\nreturn [{ json: {\n  timestamp: new Date().toISOString(),\n  phone: m.phone,\n  profileName: m.profileName,\n  reason: h.reason || '',\n  lastMessage: m.messageBody,\n  status: 'active'\n} }];"
       },
-      "id": "56b0d24a-7b1a-455d-bca5-5978306797f3",
+      "id": "e7fee551-d3de-4d4a-b40f-2ad10bccdb1f",
       "name": "Build Handoff Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         46272,
-        2426
+        2256
       ]
     }
   ],

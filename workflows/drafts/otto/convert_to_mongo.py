@@ -105,6 +105,9 @@ NORMALIZE_ITEMS_JS = """function normalizeItems(raw) {
 def convert_main():
     wf = load(os.path.join(SRC, 'WhatsApp OTTO Bot -- Baileys (Free Demo).json'))
 
+    # --- keep the OpenRouter model id the user fixed in the n8n UI
+    node_by_name(wf, 'OpenRouter Chat Model')['parameters']['model'] = 'anthropic/claude-haiku-4.5'
+
     # --- Config: Sheet ID no longer used
     cfg = node_by_name(wf, 'Config')['parameters']['assignments']['assignments']
     cfg[:] = [a for a in cfg if a['name'] != 'SHEET_ID']
