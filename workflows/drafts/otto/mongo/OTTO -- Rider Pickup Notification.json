@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## OTTO -- Rider Pickup Notification\n\nPolls the Order collection (MongoDB) every minute. When status = \"on_the_way\" and riderNotified is not yet true, sends a WhatsApp message via the bridge and marks the order as notified so it never fires twice.\n\n**Requires:**\n- Order documents must have a `jid` field (set by the main bot when the order is placed). Orders without a jid cannot be notified.\n- Staff must set status to exactly \"on_the_way\" when handing the order to a rider.",
+        "content": "## OTTO -- Rider Pickup Notification\n\nPolls the orders collection (MongoDB) every minute. When status = \"on_the_way\" and riderNotified is not yet true, sends a WhatsApp message via the bridge and marks the order as notified so it never fires twice.\n\n**Requires:**\n- Order documents must have a `jid` field (set by the main bot when the order is placed). Orders without a jid cannot be notified.\n- Staff must set status to exactly \"on_the_way\" when handing the order to a rider.",
         "height": 448,
         "width": 480,
         "color": 5
@@ -63,11 +63,11 @@
     {
       "parameters": {
         "operation": "find",
-        "collection": "Order",
+        "collection": "orders",
         "query": "{\"status\": \"on_the_way\", \"riderNotified\": {\"$ne\": true}}",
         "options": {}
       },
-      "id": "492f419c-f843-4e6d-8d40-a148f238797d",
+      "id": "23397f1d-e27d-4fcc-bfc5-fa126d81386b",
       "name": "Read All Orders",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -132,13 +132,13 @@
     {
       "parameters": {
         "operation": "findOneAndUpdate",
-        "collection": "Order",
+        "collection": "orders",
         "updateKey": "_id",
         "fields": "riderNotified",
         "upsert": false,
         "options": {}
       },
-      "id": "66a33f67-ea3b-46d1-9345-38ba02e6f0c8",
+      "id": "f7ea6230-5834-4551-9544-257b48fc15d6",
       "name": "Mark Rider Notified",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -159,7 +159,7 @@
       "parameters": {
         "jsCode": "// The HTTP node output has no order data, so rebuild one update item per order from 'Build Rider Message'.\nreturn $('Build Rider Message').all().map(i => ({ json: { _id: i.json._id, riderNotified: true } }));"
       },
-      "id": "8ef564d6-16df-4eab-bada-c31e608a379d",
+      "id": "51da72a6-e74b-4b5c-b0fc-eeb9aaf44cb9",
       "name": "Build Rider Notified Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

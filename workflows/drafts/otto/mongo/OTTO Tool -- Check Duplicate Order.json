@@ -32,14 +32,14 @@
     {
       "parameters": {
         "operation": "find",
-        "collection": "Order",
+        "collection": "orders",
         "query": "={{ JSON.stringify({ phone: $json.phone }) }}",
         "options": {
           "sort": "{\"timestamp\": -1}",
           "limit": 1
         }
       },
-      "id": "4cba6664-caa7-438e-b726-8159409a7e95",
+      "id": "5c8e857b-5a61-42a2-85bd-54e255406c99",
       "name": "Get Orders By Phone",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -111,7 +111,7 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "ea09cb23-91e1-48a5-b1a5-aaa7b02a257b",
+      "id": "bccd50bd-ad71-4080-81a7-93553e33ade4",
       "name": "Save Pending Confirmation",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -191,7 +191,7 @@
       "parameters": {
         "jsCode": "function normalizeItems(raw) {\n  let arr = raw;\n  if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (e) { arr = []; } }\n  if (!Array.isArray(arr)) arr = [];\n  return arr.filter(i => i && i.name).map(i => {\n    const out = { name: String(i.name), qty: Number(i.qty || 1) };\n    const price = Number(i.price);\n    if (i.price !== undefined && i.price !== null && i.price !== '' && isFinite(price)) out.price = price;\n    return out;\n  });\n}\n\n// Data sources:\n//   $('When Executed by Another Workflow').first().json -> phone, items (JSON string), total, address\n//   $('Find Duplicate').first().json -> reason\nconst t = $('When Executed by Another Workflow').first().json;\nconst total = Number(t.total);\n\nreturn [{ json: {\n  phone: String(t.phone),\n  pendingOrderPayload: {\n    items: normalizeItems(t.items),\n    total: isFinite(total) ? total : String(t.total),\n    address: t.address || ''\n  },\n  reason: $('Find Duplicate').first().json.reason,\n  timestamp: new Date().toISOString(),\n  awaitingConfirmation: true,\n  workflowName: $workflow.name,\n  workflowId: $workflow.id,\n  executionId: $execution.id\n} }];"
       },
-      "id": "ad2da40c-6e34-4535-8030-a486c67e4af2",
+      "id": "690b249a-5cdd-4fc2-8bea-b7eebd8009a8",
       "name": "Build Pending Confirmation Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

@@ -15,11 +15,11 @@
     {
       "parameters": {
         "operation": "find",
-        "collection": "MenuItem",
+        "collection": "menuitems",
         "query": "{\"available\": true}",
         "options": {}
       },
-      "id": "4139fb3f-998a-42f0-9f34-5d0bdabb93c2",
+      "id": "6a51a0d3-eeed-413c-9810-8e5ea7f04010",
       "name": "Fetch Menu",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,

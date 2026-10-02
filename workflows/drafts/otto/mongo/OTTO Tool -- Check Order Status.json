@@ -15,14 +15,14 @@
     {
       "parameters": {
         "operation": "find",
-        "collection": "Order",
+        "collection": "orders",
         "query": "={{ JSON.stringify({ phone: $json.query }) }}",
         "options": {
           "sort": "{\"timestamp\": -1}",
           "limit": 1
         }
       },
-      "id": "ba8df3d4-b2bd-4687-8cee-79d6d2ff4ada",
+      "id": "0cf30e74-1416-4d20-9eac-432ba8d149a0",
       "name": "Fetch Orders",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,

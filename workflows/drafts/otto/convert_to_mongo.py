@@ -5,7 +5,7 @@ Source (latest versions): workflows/drafts/otto/new_src/*.json  (+ original/ride
 Output:                   workflows/drafts/otto/mongo/*.json
 
 Only data access changes. Business logic, node names and routing stay the same.
-Collections: BotConfig, Conversation, Order, MenuItem, Handoff, pendingConfirmations, pendingCancellations.
+Collections (Mongoose defaults): botconfigs, conversations, orders, menuitems, handoffs, pendingConfirmations, pendingCancellations.
 
 Usage: python convert_to_mongo.py            (run from workflows/drafts/otto)
 Set MONGO_CRED_ID / MONGO_CRED_NAME env vars to bake in the real n8n credential.
@@ -111,17 +111,17 @@ def convert_main():
 
     # --- sticky note wording
     sn = node_by_name(wf, 'Setup Instructions')['parameters']
-    sn['content'] = sn['content'].replace('BotConfig tab in Google Sheet', 'BotConfig collection in MongoDB')
+    sn['content'] = sn['content'].replace('BotConfig tab in Google Sheet', 'botconfigs collection in MongoDB')
 
     # --- Read Bot Config
     old = node_by_name(wf, 'Read Bot Config')
     replace_node(wf, 'Read Bot Config', mongo(
-        'Read Bot Config', old['position'], 'find', 'BotConfig', keep=old, query='{}', options={}))
+        'Read Bot Config', old['position'], 'find', 'botconfigs', keep=old, query='{}', options={}))
 
     # --- Check Handoff (latest handoff row for this phone)
     old = node_by_name(wf, 'Check Handoff')
     replace_node(wf, 'Check Handoff', mongo(
-        'Check Handoff', old['position'], 'find', 'Handoff', keep=old,
+        'Check Handoff', old['position'], 'find', 'handoffs', keep=old,
         query=q('{ phone: $json.phone }'),
         options={'sort': '{"timestamp": -1}', 'limit': 1}))
     edit_code(wf, 'Compute Latest Handoff Status', ('row_number: latest.row_number', '_id: String(latest._id)'))
@@ -164,7 +164,7 @@ return [
       sessionId: m.sessionDate
   } }
 ];""")
-    log_conv = mongo('Log Conversation', li['position'], 'insert', 'Conversation', keep=li,
+    log_conv = mongo('Log Conversation', li['position'], 'insert', 'conversations', keep=li,
                      fields='phone,profileName,message,role,timestamp,sessionId',
                      options={'dateFields': 'timestamp'})
     # rewire: Send via Baileys -> Build Conversation Docs -> Log Conversation -> Track Spend
@@ -179,13 +179,13 @@ return [
     # --- Update Spend (upsert by key)
     old = node_by_name(wf, 'Update Spend')
     replace_node(wf, 'Update Spend', mongo(
-        'Update Spend', old['position'], 'findOneAndUpdate', 'BotConfig', keep=old,
+        'Update Spend', old['position'], 'findOneAndUpdate', 'botconfigs', keep=old,
         updateKey='key', fields='key,value', upsert=True, options={}))
 
     # --- Append Order
     old = node_by_name(wf, 'Append Order')
     replace_node(wf, 'Append Order', mongo(
-        'Append Order', old['position'], 'insert', 'Order', keep=old,
+        'Append Order', old['position'], 'insert', 'orders', keep=old,
         fields='orderId,timestamp,phone,profileName,items,totalAmount,deliveryAddress,status,notes,jid',
         options={'dateFields': 'timestamp'}))
     insert_before(wf, 'Append Order', code_node('Build Order Doc', below(old, 0)[:1] + [old['position'][1] + 170], NORMALIZE_ITEMS_JS + """
@@ -213,7 +213,7 @@ return [{ json: {
     # --- Log Handoff
     old = node_by_name(wf, 'Log Handoff')
     replace_node(wf, 'Log Handoff', mongo(
-        'Log Handoff', old['position'], 'insert', 'Handoff', keep=old,
+        'Log Handoff', old['position'], 'insert', 'handoffs', keep=old,
         fields='timestamp,phone,profileName,reason,lastMessage,status',
         options={'dateFields': 'timestamp'}))
     insert_before(wf, 'Log Handoff', code_node('Build Handoff Doc', [old['position'][0], old['position'][1] + 170], """// Data sources:
@@ -231,7 +231,7 @@ return [{ json: {
   status: 'active'
 } }];"""))
     nh = node_by_name(wf, 'Notify Owner Handoff')['parameters']
-    nh['jsonBody'] = nh['jsonBody'].replace('Change status to resolved in Handoffs sheet', 'Set status to resolved in the Handoff collection')
+    nh['jsonBody'] = nh['jsonBody'].replace('Change status to resolved in Handoffs sheet', 'Set status to resolved in the handoffs collection')
 
     # --- Pending confirmations ------------------------------------------------
     old = node_by_name(wf, 'Check Pending Confirmation')
@@ -267,7 +267,7 @@ return [{
     for hist, pending_src in (('Fetch History (For Confirmation)', 'confirm'), ('Fetch History (For Cancellation)', 'cancel')):
         old = node_by_name(wf, hist)
         replace_node(wf, hist, mongo(
-            hist, old['position'], 'find', 'Conversation', keep=old,
+            hist, old['position'], 'find', 'conversations', keep=old,
             query=q('{ phone: ' + PHONE_EXTRACT + ' }'),
             options={'sort': '{"timestamp": -1}', 'limit': '={{ ' + MAX_CTX + ' }}'}))
 
@@ -345,7 +345,7 @@ def convert_check_duplicate():
     wf = load(os.path.join(SRC, 'OTTO Tool -- Check Duplicate Order.json'))
     old = node_by_name(wf, 'Get Orders By Phone')
     replace_node(wf, 'Get Orders By Phone', mongo(
-        'Get Orders By Phone', old['position'], 'find', 'Order', keep=old,
+        'Get Orders By Phone', old['position'], 'find', 'orders', keep=old,
         query=q('{ phone: $json.phone }'),
         options={'sort': '{"timestamp": -1}', 'limit': 1}))
     edit_code(wf, 'Find Duplicate',
@@ -387,7 +387,7 @@ def convert_check_prev_order():
     wf = load(os.path.join(SRC, 'OTTO Tool -- Check Previous Order For Cancellation.json'))
     old = node_by_name(wf, 'Read Orders By Phone')
     replace_node(wf, 'Read Orders By Phone', mongo(
-        'Read Orders By Phone', old['position'], 'find', 'Order', keep=old,
+        'Read Orders By Phone', old['position'], 'find', 'orders', keep=old,
         query=q('{ phone: $json.phone }'),
         options={'sort': '{"timestamp": -1}', 'limit': 1}))
     edit_code(wf, 'Pick Most Recent Order',
@@ -423,7 +423,7 @@ def convert_check_status():
     wf = load(os.path.join(SRC, 'OTTO Tool -- Check Order Status.json'))
     old = node_by_name(wf, 'Fetch Orders')
     replace_node(wf, 'Fetch Orders', mongo(
-        'Fetch Orders', old['position'], 'find', 'Order', keep=old,
+        'Fetch Orders', old['position'], 'find', 'orders', keep=old,
         query=q('{ phone: $json.query }'),
         options={'sort': '{"timestamp": -1}', 'limit': 1}))
     edit_code(wf, 'Format Order Status',
@@ -435,7 +435,7 @@ def convert_get_menu():
     wf = load(os.path.join(SRC, 'OTTO Tool -- Get Menu.json'))
     old = node_by_name(wf, 'Fetch Menu')
     replace_node(wf, 'Fetch Menu', mongo(
-        'Fetch Menu', old['position'], 'find', 'MenuItem', keep=old,
+        'Fetch Menu', old['position'], 'find', 'menuitems', keep=old,
         query='{"available": true}', options={}))
     return wf, 'OTTO Tool -- Get Menu.json'
 
@@ -448,14 +448,14 @@ def convert_rider():
 
     note = node_by_name(wf, 'Setup Notes')['parameters']
     note['content'] = ('## OTTO -- Rider Pickup Notification\n\n'
-                       'Polls the Order collection (MongoDB) every minute. When status = "on_the_way" and riderNotified is not yet true, '
+                       'Polls the orders collection (MongoDB) every minute. When status = "on_the_way" and riderNotified is not yet true, '
                        'sends a WhatsApp message via the bridge and marks the order as notified so it never fires twice.\n\n'
                        '**Requires:**\n- Order documents must have a `jid` field (set by the main bot when the order is placed). '
                        'Orders without a jid cannot be notified.\n- Staff must set status to exactly "on_the_way" when handing the order to a rider.')
 
     old = node_by_name(wf, 'Read All Orders')
     replace_node(wf, 'Read All Orders', mongo(
-        'Read All Orders', old['position'], 'find', 'Order', keep=old,
+        'Read All Orders', old['position'], 'find', 'orders', keep=old,
         query='{"status": "on_the_way", "riderNotified": {"$ne": true}}', options={}))
     edit_code(wf, 'Find Newly On-The-Way Orders',
               ("// Case-insensitive, contains-match on status so small staff typos in casing\n"
@@ -471,7 +471,7 @@ def convert_rider():
 
     old = node_by_name(wf, 'Mark Rider Notified')
     replace_node(wf, 'Mark Rider Notified', mongo(
-        'Mark Rider Notified', old['position'], 'findOneAndUpdate', 'Order', keep=old,
+        'Mark Rider Notified', old['position'], 'findOneAndUpdate', 'orders', keep=old,
         updateKey='_id', fields='riderNotified', upsert=False, options={}))
     insert_before(wf, 'Mark Rider Notified', code_node('Build Rider Notified Update', [old['position'][0], old['position'][1] + 170],
         """// The HTTP node output has no order data, so rebuild one update item per order from 'Build Rider Message'.

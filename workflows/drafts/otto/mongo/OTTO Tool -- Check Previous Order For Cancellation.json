@@ -23,14 +23,14 @@
     {
       "parameters": {
         "operation": "find",
-        "collection": "Order",
+        "collection": "orders",
         "query": "={{ JSON.stringify({ phone: $json.phone }) }}",
         "options": {
           "sort": "{\"timestamp\": -1}",
           "limit": 1
         }
       },
-      "id": "2af5f102-531e-4fe4-97cc-f96adb264a53",
+      "id": "3c494ff0-a192-412d-b9c7-d02db9de601e",
       "name": "Read Orders By Phone",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -135,7 +135,7 @@
           "dateFields": "timestamp"
         }
       },
-      "id": "287ca6d3-300a-49bc-bb32-f51d227925ba",
+      "id": "9cc31aeb-d271-4867-9f77-a6c908a68c79",
       "name": "Append Pending Cancellation Row",
       "type": "n8n-nodes-base.mongoDb",
       "typeVersion": 1.3,
@@ -194,7 +194,7 @@
       "parameters": {
         "jsCode": "// Data source: $json = output of 'Is Actionable? (status = preparing)' (pass-through of 'Pick Most Recent Order')\n//   -> phone, orderId, items (array), total, address, status\nconst o = $json;\nconst total = Number(o.total);\n\nreturn [{ json: {\n  phone: String(o.phone),\n  orderId: o.orderId,\n  items: o.items,\n  total: isFinite(total) ? total : String(o.total),\n  address: o.address || '',\n  status: o.status,\n  timestamp: new Date().toISOString(),\n  awaitingConfirmation: true,\n  workflowName: $workflow.name,\n  workflowId: $workflow.id,\n  executionId: $execution.id\n} }];"
       },
-      "id": "48860e8d-4c2e-4e8a-88dc-8aa2f717799b",
+      "id": "13f48011-95cc-4402-a0f5-db5bdbd6cace",
       "name": "Build Pending Cancellation Doc",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
