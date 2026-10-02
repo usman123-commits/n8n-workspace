@@ -1,0 +1,83 @@
+{
+  "name": "OTTO Tool -- Check Order Status",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a2000001-0001-0001-0001-000000000001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "find",
+        "collection": "Order",
+        "query": "={{ JSON.stringify({ phone: $json.query }) }}",
+        "options": {
+          "sort": "{\"timestamp\": -1}",
+          "limit": 1
+        }
+      },
+      "id": "c959d1e5-acce-476e-a8e5-4abf8f1b296d",
+      "name": "Fetch Orders",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        304
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "MONGO_CRED_ID",
+          "name": "MongoDB account"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const orders = $input.all();\nconst valid = orders.filter(o => o.json.orderId && o.json.status);\nif (valid.length === 0) return [{ json: { response: 'No orders found for this customer.' } }];\n\nconst latest = valid[0].json; // newest first (sorted in the Mongo query)\n\nreturn [{\n  json: {\n    response: `Order ID: ${latest.orderId}\nItems: ${JSON.stringify(latest.items)}\nTotal: Rs. ${latest.totalAmount}\nStatus: ${latest.status}\nAddress: ${latest.deliveryAddress || 'not set'}\nStatus meanings: preparing = kitchen is making it, on_the_way = rider has picked it up and is on the way to customer, delivered = already delivered, cancelled = order was cancelled.`\n  }\n}];"
+      },
+      "id": "a2000001-0001-0001-0001-000000000003",
+      "name": "Format Order Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Orders": {
+      "main": [
+        [
+          {
+            "node": "Format Order Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

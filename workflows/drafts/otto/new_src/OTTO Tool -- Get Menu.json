@@ -1,0 +1,109 @@
+{
+  "name": "OTTO Tool -- Get Menu",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1000001-0001-0001-0001-000000000001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "0",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "available",
+              "lookupValue": "yes"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "a1000001-0001-0001-0001-000000000002",
+      "name": "Fetch Menu",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        224,
+        304
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst menu = {};\n\nfor (const item of items) {\n  const r = item.json;\n  if (!r.item || !r.price) continue;\n  if (!menu[r.category]) menu[r.category] = [];\n  const desc = r.description ? ` (${r.description})` : '';\n  menu[r.category].push(`${r.item} - Rs. ${r.price}${desc}`);\n}\n\nlet menuText = 'CURRENT MENU:\\n';\nfor (const [cat, list] of Object.entries(menu)) {\n  menuText += `\\n${cat}:\\n`;\n  for (const line of list) {\n    menuText += `- ${line}\\n`;\n  }\n}\n\nreturn [{ json: { response: menuText } }];"
+      },
+      "id": "a1000001-0001-0001-0001-000000000003",
+      "name": "Format Menu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Menu": {
+      "main": [
+        [
+          {
+            "node": "Format Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "7c5a57b2-37c3-45a1-839c-ba6303e7dc1e",
+  "meta": {
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "nodeGroups": [],
+  "id": "3Tx6M2wqMeJGPp3h",
+  "tags": []
+}

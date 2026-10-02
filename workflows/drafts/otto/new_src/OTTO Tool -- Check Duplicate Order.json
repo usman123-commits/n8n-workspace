@@ -1,0 +1,416 @@
+{
+  "name": "OTTO Tool -- Check Duplicate Order",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "phone"
+            },
+            {
+              "name": "items"
+            },
+            {
+              "name": "total"
+            },
+            {
+              "name": "address"
+            }
+          ]
+        }
+      },
+      "id": "46e29a5a-3068-47c5-9a9d-773dd0bf1871",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1344,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1195076550",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "5ae85688-f063-4f54-ad5f-485518499238",
+      "name": "Get Orders By Phone",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1120,
+        144
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst trigger = $('When Executed by Another Workflow').first().json;\n\nif (rows.length === 0) {\n  return [{ json: { isDuplicate: false, reason: 'no_previous_orders' } }];\n}\n\nrows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\nconst newest = rows[0];\n\nconst minutesSinceLastOrder = (Date.now() - new Date(newest.timestamp).getTime()) / 60000;\n\nlet newItems = [];\nlet itemsParsedOk = true;\ntry { newItems = JSON.parse(trigger.items || '[]'); } catch (e) { itemsParsedOk = false; }\nlet lastItems = [];\ntry { lastItems = JSON.parse(newest.items || '[]'); } catch (e) {}\n\nfunction normalize(items) {\n  return items\n    .map(i => (String(i.name || '').trim().toLowerCase()) + '::' + (i.qty || 1))\n    .sort()\n    .join('|');\n}\n\nconst itemsMissing = newItems.length === 0;\nconst rawItemsMatch = normalize(newItems) === normalize(lastItems);\nconst itemsMatch = itemsMissing ? false : rawItemsMatch;\n\nconst withinWindow = minutesSinceLastOrder <= 30;\n\nconst isDuplicate = withinWindow || itemsMatch;\n\nlet reason = 'not_duplicate';\nif (isDuplicate) {\n  if (withinWindow && itemsMatch) reason = 'same_order_within_30min';\n  else if (withinWindow && !itemsMatch) reason = 'different_order_within_30min';\n  else if (!withinWindow && itemsMatch) reason = 'same_order_after_30min';\n}\n\nreturn [{\n  json: {\n    isDuplicate,\n    reason,\n    itemsMatch,\n    itemsMissing,\n    itemsParsedOk,\n    minutesSinceLastOrder: Math.round(minutesSinceLastOrder),\n    lastOrderId: newest.orderId,\n    lastOrderItems: newest.items,\n    lastOrderTotal: newest.totalAmount,\n    lastOrderStatus: newest.status\n  }\n}];"
+      },
+      "id": "acaa51a4-cf17-4343-a53b-267ca0e10c79",
+      "name": "Find Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "id1",
+              "leftValue": "={{ String($json.isDuplicate) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ddb90e1d-eb70-4352-a7c6-d4604fbbd9b7",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingConfirmations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone": "={{ $('When Executed by Another Workflow').first().json.phone }}",
+            "pendingOrderPayload": "={{ JSON.stringify({ items: (function(){ try { return JSON.parse($('When Executed by Another Workflow').first().json.items || '[]'); } catch(e) { return []; } })(), total: $('When Executed by Another Workflow').first().json.total, address: $('When Executed by Another Workflow').first().json.address || '' }) }}",
+            "reason": "={{ $('Find Duplicate').first().json.reason }}",
+            "timestamp": "={{ new Date().toISOString() }}",
+            "awaitingConfirmation": "true",
+            "workflowName": "={{ $workflow.name }}",
+            "executionId": "={{ $execution.id }}",
+            "workflowId": "={{ $workflow.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pendingOrderPayload",
+              "displayName": "pendingOrderPayload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflowId",
+              "displayName": "workflowId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1ad297f6-4e93-4738-aa18-62a54a5c1dc3",
+      "name": "Save Pending Confirmation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Find Duplicate').first().json }];"
+      },
+      "id": "a4218238-b232-4962-9a33-e5f649fb232c",
+      "name": "Passthrough Original Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('When Executed by Another Workflow').first().json;\n\nfunction parseItems(raw) {\n  if (Array.isArray(raw)) return raw;\n  if (raw && typeof raw === 'object') return raw;\n  if (typeof raw === 'string' && raw.trim()) {\n    try { return JSON.parse(raw); } catch (e) { return []; }\n  }\n  return [];\n}\n\nconst items = parseItems(trigger.items);\nconst total = parseFloat(trigger.total);\n\nconst validItems = Array.isArray(items) && items.length > 0 &&\n  items.every(i => i && typeof i.name === 'string' && i.name.trim().length > 0);\nconst validTotal = !isNaN(total) && total > 0;\n\nreturn [{ json: { valid: validItems && validTotal } }];"
+      },
+      "id": "b72cd7c5-2e82-4784-b898-634afd39c5be",
+      "name": "Validate Order Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "vd1",
+              "leftValue": "={{ String($json.valid) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "272b1cb5-df55-4250-acf5-da1da9137860",
+      "name": "Has Valid Order Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        80
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Orders By Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Orders By Phone": {
+      "main": [
+        [
+          {
+            "node": "Find Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Validate Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Passthrough Original Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Pending Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Passthrough Original Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Order Data": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Order Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Order Data?": {
+      "main": [
+        [
+          {
+            "node": "Save Pending Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Passthrough Original Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "b1c18cba-228e-4f0c-9297-88f5a50660e2",
+  "meta": {
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "nodeGroups": [],
+  "id": "dh3RRwTFXZgyNABm",
+  "tags": []
+}

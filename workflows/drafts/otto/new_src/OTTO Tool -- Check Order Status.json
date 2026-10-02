@@ -1,0 +1,109 @@
+{
+  "name": "OTTO Tool -- Check Order Status",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a2000001-0001-0001-0001-000000000001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1195076550",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $json.query }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "a2000001-0001-0001-0001-000000000002",
+      "name": "Fetch Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        224,
+        304
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const orders = $input.all();\nconst valid = orders.filter(o => o.json.orderId && o.json.status);\nif (valid.length === 0) return [{ json: { response: 'No orders found for this customer.' } }];\n\nconst latest = valid[valid.length - 1].json;\n\nreturn [{\n  json: {\n    response: `Order ID: ${latest.orderId}\nItems: ${latest.items}\nTotal: Rs. ${latest.totalAmount}\nStatus: ${latest.status}\nAddress: ${latest.deliveryAddress || 'not set'}\nStatus meanings: preparing = kitchen is making it, on_the_way = rider has picked it up and is on the way to customer, delivered = already delivered, cancelled = order was cancelled.`\n  }\n}];"
+      },
+      "id": "a2000001-0001-0001-0001-000000000003",
+      "name": "Format Order Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Orders": {
+      "main": [
+        [
+          {
+            "node": "Format Order Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "14e91c66-1e59-4068-a6ea-c97e12445683",
+  "meta": {
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "nodeGroups": [],
+  "id": "y6L51eotmZwK6dz8",
+  "tags": []
+}

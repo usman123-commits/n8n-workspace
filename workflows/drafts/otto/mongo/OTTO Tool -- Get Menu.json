@@ -1,0 +1,80 @@
+{
+  "name": "OTTO Tool -- Get Menu",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1000001-0001-0001-0001-000000000001",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "find",
+        "collection": "MenuItem",
+        "query": "{\"available\": true}",
+        "options": {}
+      },
+      "id": "831400dc-a573-4d57-9647-e8ed9c0d4300",
+      "name": "Fetch Menu",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        304
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "MONGO_CRED_ID",
+          "name": "MongoDB account"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst menu = {};\n\nfor (const item of items) {\n  const r = item.json;\n  if (!r.item || !r.price) continue;\n  if (!menu[r.category]) menu[r.category] = [];\n  const desc = r.description ? ` (${r.description})` : '';\n  menu[r.category].push(`${r.item} - Rs. ${r.price}${desc}`);\n}\n\nlet menuText = 'CURRENT MENU:\\n';\nfor (const [cat, list] of Object.entries(menu)) {\n  menuText += `\\n${cat}:\\n`;\n  for (const line of list) {\n    menuText += `- ${line}\\n`;\n  }\n}\n\nreturn [{ json: { response: menuText } }];"
+      },
+      "id": "a1000001-0001-0001-0001-000000000003",
+      "name": "Format Menu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Menu": {
+      "main": [
+        [
+          {
+            "node": "Format Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

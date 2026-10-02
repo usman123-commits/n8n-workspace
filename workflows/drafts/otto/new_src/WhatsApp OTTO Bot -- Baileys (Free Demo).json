@@ -1,0 +1,3237 @@
+{
+  "name": "WhatsApp OTTO Bot -- Baileys (Free Demo)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## OTTO Food on Wheels -- Baileys Bot (AI Agent)\n\n**Restaurant:** OTTO Food on Wheels\n**Location:** Park Enclave Road, Islamabad\n**Config:** BotConfig tab in Google Sheet\n**Webhook:** /webhook/otto-baileys\n\n**Architecture:** AI Agent with tools\n- get_menu: fetches menu on demand\n- check_order_status: checks order by phone\n\n**Requires:** Anthropic API credential in n8n",
+        "height": 372,
+        "width": 464,
+        "color": 5
+      },
+      "id": "153f7803-a3ff-4a24-8add-45b6f9d07d31",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        35760,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Voice Note Flow\n\nBaileys bridge saves audio to temp_audio/,\nserves at localhost:3000/audio/filename.ogg\nn8n downloads -> Whisper -> transcription\nCost tracked in BotConfig WHISPER_SPENT",
+        "height": 180,
+        "width": 340,
+        "color": 6
+      },
+      "id": "455fe521-b5c6-4635-b45d-c6cec6a95fd3",
+      "name": "Voice Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        36288,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "otto-baileys",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "01b39678-f72d-487a-aad6-819a593fe33b",
+      "name": "Baileys Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        35760,
+        2096
+      ],
+      "webhookId": "otto-baileys"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bc1",
+              "name": "BRIDGE_URL",
+              "value": "http://localhost:3000",
+              "type": "string"
+            },
+            {
+              "id": "bc2",
+              "name": "OWNER_JID",
+              "value": "923000000000@s.whatsapp.net",
+              "type": "string"
+            },
+            {
+              "id": "bc3",
+              "name": "SHEET_ID",
+              "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+              "type": "string"
+            },
+            {
+              "id": "bc4",
+              "name": "CLAUDE_MODEL",
+              "value": "claude-haiku-4-5-20251001",
+              "type": "string"
+            },
+            {
+              "id": "bc6",
+              "name": "ALLOWED_NUMBERS",
+              "value": "221466012467213",
+              "type": "string"
+            },
+            {
+              "id": "bc5",
+              "name": "SYSTEM_PROMPT",
+              "value": "(fallback -- BotConfig sheet takes priority)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4060dcfc-1190-4bd3-add2-b2715f60f6c1",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        35984,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1039937095",
+          "mode": "id"
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "eff6d937-0366-4f21-a6e3-9f10ee69c994",
+      "name": "Read Bot Config",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        36208,
+        2096
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst config = {};\nfor (const row of rows) {\n  const k = row.json.key;\n  const v = row.json.value;\n  if (k) config[k] = String(v || '');\n}\nreturn [{ json: config }];"
+      },
+      "id": "4ff96a0b-1439-423d-ae95-6723e3a488fc",
+      "name": "Bot Config Map",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        36432,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wh = $('Baileys Webhook').first().json.body;\nconst rawJid = wh.from || '';\nconst phone = rawJid.split('@')[0];\n\nconst allowed = $('Config').first().json.ALLOWED_NUMBERS || '';\nif (allowed.trim()) {\n  const list = allowed.split(',').map(n => n.trim());\n  if (!list.includes(phone)) {\n    return [];\n  }\n}\n\nreturn [{\n  json: {\n    phone: phone,\n    jid: rawJid,\n    profileName: wh.fromName || '',\n    messageBody: wh.message || '',\n    quotedText: wh.quotedText || '',\n    timestamp: wh.timestamp || new Date().toISOString(),\n    sessionDate: new Date().toISOString().slice(0, 10),\n    hasVoice: wh.hasAudio === true,\n    mediaUrl: wh.audioUrl || ''\n  }\n}];"
+      },
+      "id": "27e90a2a-7ffd-4679-988a-f534eaee6be3",
+      "name": "Parse Webhook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        36656,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bv1",
+              "leftValue": "={{ $json.hasVoice }}",
+              "rightValue": "={{ true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2824aa8-f45e-4a90-b5ff-9290ed205c70",
+      "name": "Has Voice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        36880,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Parse Webhook').first().json.mediaUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "1693a69e-dfd0-40a4-a319-4fc79488ccf5",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        37104,
+        2032
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "gpt-transcribe"
+            },
+            {
+              "name": "prompt",
+              "value": "Always give answer in roman urdu . dont give answers in hindi like mujhe do zinger burger chahiye, delivery address Bahria Town hai."
+            },
+            {
+              "name": "languages[]",
+              "value": "ur"
+            },
+            {
+              "name": "languages[]",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "caf220ea-8034-49d0-9ea1-8953a3718d07",
+      "name": "Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        37328,
+        2032
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "mdbw8najufAlt09o",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pw = $('Parse Webhook').first().json;\nconst transcription = $json?.text;\nlet messageBody = transcription || pw.messageBody;\n\nif (!messageBody || !messageBody.trim()) {\n  return [];\n}\n\nif (pw.quotedText && pw.quotedText.trim()) {\n  messageBody = '[Replying to: \"' + pw.quotedText.trim() + '\"] ' + messageBody;\n}\n\nreturn [{\n  json: {\n    phone: pw.phone,\n    jid: pw.jid,\n    profileName: pw.profileName,\n    messageBody: messageBody,\n    timestamp: pw.timestamp,\n    sessionDate: pw.sessionDate\n  }\n}];"
+      },
+      "id": "09273566-1781-408a-a551-a8dff11a8960",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37552,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "578724165",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "5798f726-91e6-4e43-89ff-770a7e43dd99",
+      "name": "Check Handoff",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        37776,
+        2096
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "ho1",
+              "leftValue": "={{ String($json.status || '') }}",
+              "rightValue": "active",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "53a3a892-512b-4378-9f50-4665c0f46c7f",
+      "name": "Already Handed Off?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        38224,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const agentOutput = $input.first().json;\nconst raw = agentOutput.output || agentOutput.text || '';\n\nlet orderData = null;\nlet handoffData = null;\nlet aiReply = raw;\n\nconst orderMatch = raw.match(/<<<ORDER:(.*?)>>>/s);\nif (orderMatch) {\n  try { orderData = JSON.parse(orderMatch[1]); } catch (e) {}\n  aiReply = raw.replace(/<<<ORDER:.*?>>>/s, '').trim();\n}\n\nconst handoffMatch = raw.match(/<<<HANDOFF:(.*?)>>>/s);\nif (handoffMatch) {\n  try { handoffData = JSON.parse(handoffMatch[1]); } catch (e) {}\n  aiReply = raw.replace(/<<<HANDOFF:.*?>>>/s, '').trim();\n}\n\nlet action = 'chat';\nif (orderData) action = 'order';\nelse if (handoffData) action = 'handoff';\n\nreturn [{ json: { aiReply, orderData, handoffData, action } }];"
+      },
+      "id": "256d1be3-1321-4db2-9283-5f499fd99806",
+      "name": "Process Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        44256,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.BRIDGE_URL + '/send' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $('Extract Message').first().json.jid, message: $('Process Reply').first().json.aiReply }) }}",
+        "options": {}
+      },
+      "id": "a3750c8a-1a7d-4d8b-ad2e-2ab8a76952ef",
+      "name": "Send via Baileys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        44480,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "244215354",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $('Extract Message').first().json.timestamp }}",
+            "phone": "={{ $('Extract Message').first().json.phone }}",
+            "profileName": "={{ $('Extract Message').first().json.profileName }}",
+            "direction": "incoming",
+            "message": "={{ $('Extract Message').first().json.messageBody }}",
+            "sessionDate": "={{ $('Extract Message').first().json.sessionDate }}",
+            "workflowName": "={{ $workflow.name }}",
+            "workflowId": "={{ $workflow.id }}",
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profileName",
+              "displayName": "profileName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sessionDate",
+              "displayName": "sessionDate",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowId",
+              "displayName": "workflowId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b85d68b1-5ee7-49cd-92f3-0071947641ee",
+      "name": "Log Incoming",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        44704,
+        2208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "244215354",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ new Date().toISOString() }}",
+            "phone": "={{ $('Extract Message').first().json.phone }}",
+            "profileName": "BOT",
+            "direction": "outgoing",
+            "message": "={{ $('Process Reply').first().json.aiReply }}",
+            "sessionDate": "={{ $('Extract Message').first().json.sessionDate }}",
+            "workflowName": "={{ $workflow.name }}",
+            "workflowId": "={{ $workflow.id }}",
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profileName",
+              "displayName": "profileName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sessionDate",
+              "displayName": "sessionDate",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowId",
+              "displayName": "workflowId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a39da863-4188-4ada-8e2e-c7777c4e5638",
+      "name": "Log Outgoing",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        44928,
+        2208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const botConfig = $('Bot Config Map').first().json;\nconst wasVoice = $('Parse Webhook').first().json.hasVoice;\n\nlet agentOutput = null;\ntry {\n  agentOutput = $('AI Agent').first().json;\n} catch (e) {\n  agentOutput = null;\n}\n\nlet estInputTokens, estOutputTokens, claudeCost;\n\nif (agentOutput) {\n  const outputText = agentOutput.output || '';\n  const steps = agentOutput.steps || [];\n  const hadToolUse = steps.length > 0;\n\n  estInputTokens = hadToolUse ? 2500 : 1000;\n  estOutputTokens = Math.ceil(outputText.length / 4);\n  claudeCost = (estInputTokens * 0.25 + estOutputTokens * 1.25) / 1000000;\n} else {\n  estInputTokens = 400;\n  estOutputTokens = 15;\n  claudeCost = (estInputTokens * 0.25 + estOutputTokens * 1.25) / 1000000;\n}\n\nconst currentClaudeSpent = parseFloat(botConfig.CLAUDE_SPENT || '0');\nconst newClaudeSpent = (currentClaudeSpent + claudeCost).toFixed(6);\n\nconst items = [{ json: { key: 'CLAUDE_SPENT', value: newClaudeSpent } }];\n\nif (wasVoice) {\n  const currentWhisperSpent = parseFloat(botConfig.WHISPER_SPENT || '0');\n  const whisperCost = 0.006;\n  const newWhisperSpent = (currentWhisperSpent + whisperCost).toFixed(6);\n  items.push({ json: { key: 'WHISPER_SPENT', value: newWhisperSpent } });\n}\n\nreturn items;"
+      },
+      "id": "290c9c3b-a4fa-4bff-9156-3e1194ea222d",
+      "name": "Track Spend",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        45152,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1039937095",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "={{ $json.key }}",
+            "value": "={{ $json.value }}"
+          },
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "id": "key",
+              "displayName": "key",
+              "type": "string",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "value",
+              "displayName": "value",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "880573a8-a685-4326-997b-1b312fa83b75",
+      "name": "Update Spend",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        45376,
+        2208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "ord1",
+              "leftValue": "={{ $('Process Reply').first().json.action }}",
+              "rightValue": "order",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "849b1a42-f898-4f91-a49f-a1bfaeeb881a",
+      "name": "Has Order?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        45824,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1195076550",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "orderId": "={{ 'OTTO-' + Date.now() }}",
+            "timestamp": "={{ new Date().toISOString() }}",
+            "phone": "={{ $('Extract Message').first().json.phone }}",
+            "profileName": "={{ $('Extract Message').first().json.profileName }}",
+            "items": "={{ JSON.stringify($('Process Reply').first().json.orderData?.items || []) }}",
+            "totalAmount": "={{ String($('Process Reply').first().json.orderData?.total || 0) }}",
+            "deliveryAddress": "={{ $('Process Reply').first().json.orderData?.address || '' }}",
+            "status": "preparing",
+            "notes": "",
+            "jid": "={{ $('Extract Message').first().json.jid }}",
+            "workflowName": "={{ $workflow.name }}",
+            "workflowId": "={{ $workflow.id }}",
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "orderId",
+              "displayName": "orderId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profileName",
+              "displayName": "profileName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "items",
+              "displayName": "items",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "totalAmount",
+              "displayName": "totalAmount",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "deliveryAddress",
+              "displayName": "deliveryAddress",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "jid",
+              "displayName": "jid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "jid",
+              "displayName": "jid",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowId",
+              "displayName": "workflowId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6edf02ef-286b-4112-bce6-6df0db1b07b7",
+      "name": "Append Order",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        46272,
+        1968
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.BRIDGE_URL + '/send' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $('Config').first().json.OWNER_JID, message: 'NEW ORDER -- OTTO\\n\\nCustomer: ' + $('Extract Message').first().json.profileName + '\\nPhone: ' + $('Extract Message').first().json.phone + '\\nItems: ' + JSON.stringify($('Process Reply').first().json.orderData?.items || []) + '\\nTotal: Rs. ' + ($('Process Reply').first().json.orderData?.total || 0) + '\\nAddress: ' + ($('Process Reply').first().json.orderData?.address || 'not provided') }) }}",
+        "options": {}
+      },
+      "id": "b97fb76d-7f63-445f-ad15-190f94ed9e33",
+      "name": "Notify Owner Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        46496,
+        1968
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "hf1",
+              "leftValue": "={{ $('Process Reply').first().json.action }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "02e9b4ba-024d-4c49-bd34-35a3b49be633",
+      "name": "Handoff Requested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        46048,
+        2256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "578724165",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ new Date().toISOString() }}",
+            "phone": "={{ $('Extract Message').first().json.phone }}",
+            "profileName": "={{ $('Extract Message').first().json.profileName }}",
+            "reason": "={{ $('Process Reply').first().json.handoffData?.reason || '' }}",
+            "lastMessage": "={{ $('Extract Message').first().json.messageBody }}",
+            "status": "active",
+            "workflowName": "={{ $workflow.name }}",
+            "workflowId": "={{ $workflow.id }}",
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profileName",
+              "displayName": "profileName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lastMessage",
+              "displayName": "lastMessage",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflowId",
+              "displayName": "workflowId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8b90aaf2-dfc6-4600-b5c5-efc274da08d5",
+      "name": "Log Handoff",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        46272,
+        2256
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.BRIDGE_URL + '/send' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $('Config').first().json.OWNER_JID, message: 'HANDOFF NEEDED -- OTTO\\n\\nCustomer: ' + $('Extract Message').first().json.profileName + '\\nPhone: ' + $('Extract Message').first().json.phone + '\\nReason: ' + ($('Process Reply').first().json.handoffData?.reason || 'unknown') + '\\nLast message: ' + $('Extract Message').first().json.messageBody + '\\n\\nBot is SILENT for this number. Change status to resolved in Handoffs sheet to re-enable.' }) }}",
+        "options": {}
+      },
+      "id": "59a6ffb0-40a8-4ec3-ae49-cfeb87649ad6",
+      "name": "Notify Owner Handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        46496,
+        2256
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "br1",
+              "name": "status",
+              "value": "ok",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7d56e3d9-7da8-45ee-95dd-bd2b79a4069c",
+      "name": "ACK",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        46720,
+        2192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const vars = $('Extract Message').first().json;\nreturn [{\n  json: {\n    userMessage: vars.messageBody,\n    phone: vars.phone,\n    turnNote: ''\n  }\n}];"
+      },
+      "id": "8ae76eae-581a-4c25-873c-c991a1778daf",
+      "name": "Build Agent Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        43184,
+        1952
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userMessage }}",
+        "options": {
+          "systemMessage": "={{ '<customer_phone>\\n' + $json.phone + '\\n</customer_phone>\\n\\n' + ($('Bot Config Map').first().json.SYSTEM_PROMPT || $('Config').first().json.SYSTEM_PROMPT) + ($json.turnNote ? ('\\n\\n<current_turn_context>\\n' + $json.turnNote + '\\n</current_turn_context>') : '') }}",
+          "maxIterations": 6
+        }
+      },
+      "id": "5b29366c-6afa-4385-a584-bb100fa06c11",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        43664,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_menu",
+        "description": "Get the full restaurant menu with all available items, categories, and prices. Call this whenever the customer asks about food, menu, items, prices, deals, or wants to order something.",
+        "workflowId": {
+          "__rl": true,
+          "value": "3Tx6M2wqMeJGPp3h",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/3Tx6M2wqMeJGPp3h",
+          "cachedResultName": "OTTO Tool -- Get Menu"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "6ffd1d0b-c101-42f7-920f-6eee69c97eea",
+      "name": "Tool: Get Menu",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        43664,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "name": "check_order_status",
+        "description": "Check the status of the customer's most recent order. Call this when the customer asks about their order status, delivery progress, or where their food is. You MUST pass the phone parameter.",
+        "workflowId": {
+          "__rl": true,
+          "value": "y6L51eotmZwK6dz8",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/y6L51eotmZwK6dz8",
+          "cachedResultName": "OTTO Tool -- Check Order Status"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "06a07220-e775-4bbd-961e-b22a4f2bdbc8",
+      "name": "Tool: Check Order",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        43792,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "dh3RRwTFXZgyNABm",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/dh3RRwTFXZgyNABm",
+          "cachedResultName": "OTTO Tool -- Check Duplicate Order"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('phone', `The customer's phone number for this order, exactly as given in the conversation`, 'string') }}",
+            "items": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('items', `A JSON array string of the order items about to be confirmed, using the exact same items and quantities you are about to place in the ORDER tag. Format: [{\\\"name\\\":\\\"Item Name\\\",\\\"qty\\\":1}]. Never leave this blank or send only some of the items.`, 'string') }}",
+            "total": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('total', `The total order amount in Rupees as a plain number, matching the total you are about to place in the ORDER tag`, 'string') }}",
+            "address": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('address', `The customer's delivery address for this order, exactly as given in the conversation. Leave empty only if the customer truly has not given an address yet.`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "items",
+              "displayName": "items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        43920,
+        1936
+      ],
+      "id": "a1e3474e-42d9-4d03-8d4d-976fc0a4345a",
+      "name": "Call 'OTTO Tool -- Check Duplicate Order'"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingConfirmations",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Extract Message').first().json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "6bf5b84f-1294-4165-9db6-782a29dfb93f",
+      "name": "Check Pending Confirmation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        38448,
+        2096
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const phone = $('Extract Message').first().json.phone;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.phone);\nrows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\nconst row = rows.find(r => String(r.awaitingConfirmation).toLowerCase() === 'true');\n\nif (!row) {\n  return [{ json: { awaiting: false, phone } }];\n}\n\nconst minutesSince = (Date.now() - new Date(row.timestamp).getTime()) / 60000;\nif (!(minutesSince <= 30)) {\n  return [{ json: { awaiting: false, expired: true, phone, row_number: row.row_number } }];\n}\n\nlet pendingOrderPayload = {};\ntry { pendingOrderPayload = JSON.parse(row.pendingOrderPayload || '{}'); } catch (e) {}\n\nreturn [{\n  json: {\n    awaiting: true,\n    pendingOrderPayload,\n    reason: row.reason || '',\n    phone: row.phone,\n    row_number: row.row_number,\n    customerMessage: $('Extract Message').first().json.messageBody\n  }\n}];"
+      },
+      "id": "258fab6e-b0c9-4c64-b693-03c6ee78b7e6",
+      "name": "Compute Pending Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        38672,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "aw1",
+              "leftValue": "={{ String($json.awaiting) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2bb7208c-bb43-47c0-b2e4-4ee9902db64e",
+      "name": "Awaiting Confirmation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        38896,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "244215354",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Extract Message').first().json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "7b6836f1-349b-49bf-85c3-9282fc5c8f6a",
+      "name": "Fetch History (For Confirmation)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        39120,
+        1968
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nconst pending = $('Compute Pending Status').first().json;\nconst maxCtx = parseInt(($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20'), 10);\n\nlet historyLines = [];\nfor (const item of allItems) {\n  const row = item.json;\n  if (!row.message || !row.direction) continue;\n  const role = row.direction === 'outgoing' ? 'Bot' : 'Customer';\n  historyLines.push(role + ': ' + String(row.message));\n}\nhistoryLines = historyLines.slice(-(maxCtx - 1));\nconst conversationHistory = historyLines.length > 0 ? historyLines.join('\\n') : '(no recent history)';\n\nreturn [{\n  json: {\n    phone: pending.phone,\n    pendingOrderPayload: pending.pendingOrderPayload,\n    reason: pending.reason,\n    customerMessage: pending.customerMessage,\n    row_number: pending.row_number,\n    conversationHistory\n  }\n}];"
+      },
+      "id": "bef442a9-965f-45a5-9d64-f71ba048522c",
+      "name": "Build Classify Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        39344,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "id": "6a9a55d6-7a23-4812-a603-d19edded0813",
+      "name": "Confirmation Chat Model",
+      "position": [
+        39648,
+        2192
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "q5ot0v1b7NSZ3Hav",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ '<context>\\n' +'<customer_phone>' + $json.phone + '</customer_phone>\\n' +'<reason_for_confirmation>' + $json.reason + '</reason_for_confirmation>\\n' +'<pending_order>' + JSON.stringify($json.pendingOrderPayload) + '</pending_order>\\n' +'<conversation_history>\\n' + $json.conversationHistory + '\\n</conversation_history>\\n' +'<customer_latest_reply>' + $json.customerMessage + '</customer_latest_reply>\\n' +'</context>\\n\\n' +'<task>\\n' +'The customer was asked a duplicate-order confirmation question with exactly three options: confirm, cancel, or modify. Classify their latest reply into exactly one of these four outcomes:\\n\\n' +'- confirmed: they clearly agree to proceed with the pending order exactly as it is (whether as the same order again, or explicitly agreeing it is a separate/different order).\\n' +'- declined: they clearly say no, cancel, or do not want this order, with no request to change anything.\\n' +'- modify: they want to change something about the order (items, size, flavor, quantity, address) before it is placed. This is a distinct outcome -- never classify a modify request as declined or unclear.\\n' +'- unclear: anything else -- a question, an unrelated message, or a reply that does not clearly address the confirmation at all.\\n' +'</task>\\n\\n' +'<output_format>\\n' +'Reply with STRICT JSON only, no other text: {\"result\": \"confirmed\"} or {\"result\": \"declined\"} or {\"result\": \"modify\"} or {\"result\": \"unclear\"}.\\n' +'</output_format>' }}"
+      },
+      "id": "31b91b55-5b22-43c4-ad41-a0ba00abb7e9",
+      "name": "Classify Confirmation",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        39568,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst raw = item.text || (item.response && item.response.text) || item.output || '';\nlet rawResult = 'unclear';\ntry {\n  const match = String(raw).match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match ? match[0] : raw);\n  if (['confirmed', 'declined', 'modify', 'unclear'].includes(parsed.result)) {\n    rawResult = parsed.result;\n  }\n} catch (e) {\n  rawResult = 'unclear';\n}\n\n// modify and declined route identically downstream -- both clear the pending flag\n// and hand off to a fresh, independent conversation. Keep the real classification\n// visible separately for debugging.\nconst result = (rawResult === 'modify') ? 'declined' : rawResult;\n\nconst pending = $('Compute Pending Status').first().json;\nreturn [{\n  json: {\n    result,\n    classifiedAs: rawResult,\n    phone: pending.phone,\n    row_number: pending.row_number,\n    pendingOrderPayload: pending.pendingOrderPayload\n  }\n}];"
+      },
+      "id": "ebe56a76-d1c2-4e99-bf05-5c6c297a972e",
+      "name": "Parse Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        39920,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cf1",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "confirmed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "da130e8d-e097-402f-8aeb-6df8a147bc61",
+      "name": "Is Confirmed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        40144,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingConfirmations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Parse Confirmation').first().json.row_number }}",
+            "awaitingConfirmation": "false"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7bb71cb5-c9e1-46f0-9130-c49a3586aec5",
+      "name": "Clear Pending Flag (Confirmed)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        43184,
+        2512
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingConfirmations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Parse Confirmation').first().json.row_number }}",
+            "awaitingConfirmation": "false"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "79c0654b-5a32-4bf0-9914-2fb385079a87",
+      "name": "Clear Pending Flag (Not Confirmed)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        40592,
+        1856
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Confirmation').first().json;\nconst pending = parsed.pendingOrderPayload || {};\nconst items = pending.items || [];\nconst total = pending.total || 0;\nconst itemLines = items.map(i => '- ' + i.name + ' x' + i.qty).join('\\n');\nconst msg = 'Aap ka order confirm ho gaya:\\n' + itemLines + '\\nTotal: Rs. ' + total + '\\nRider ke pass jaate hi aapko alert mil jayega.';\nconst orderTag = '<<<ORDER:' + JSON.stringify(pending) + '>>>';\nreturn [{ json: { output: msg + '\\n' + orderTag } }];"
+      },
+      "id": "eafffde8-8929-4da8-9e87-b67b6cf327c3",
+      "name": "Build Confirmed Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        43728,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "dc1",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "declined",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "838714b7-f1c5-42d2-9275-5c14481b2bc2",
+      "name": "Is Declined?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        40368,
+        1568
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const classifyInput = $('Build Classify Input').first().json;\nconst vars = $('Extract Message').first().json;\n\nconst pendingNote = 'You previously asked the customer to confirm whether to proceed with this pending order: ' +\n  JSON.stringify(classifyInput.pendingOrderPayload) +\n  '. Their last reply did not clearly say yes or no to that question. First briefly address ' +\n  'whatever they just said, then politely ask again for confirmation as a numbered list: ' +\n  '1. Confirm  2. Cancel  3. Modify. Do not append the ORDER tag until they clearly confirm ' +\n  'this specific pending order.';\n\nreturn [{\n  json: {\n    userMessage: vars.messageBody,\n    phone: vars.phone,\n    turnNote: pendingNote\n  }\n}];"
+      },
+      "id": "512aac0f-4b47-46ed-b59b-7f6d1e6a1f7f",
+      "name": "Build Agent Input (Pending Reminder)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        43184,
+        1488
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "ex1",
+              "leftValue": "={{ String($json.expired) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9296bbe1-a4c5-4ee3-8a35-e66f112c69fb",
+      "name": "Expired Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        40368,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingConfirmations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "awaitingConfirmation": "false"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f81fc49-5c89-42af-8b88-6184dff70cfa",
+      "name": "Clear Pending Flag (Expired)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        40592,
+        2768
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingCancellations",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Extract Message').first().json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "43a2d7ba-5637-421b-985d-c51dabee368f",
+      "name": "Check Pending Cancellation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        40816,
+        1856
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const phone = $('Extract Message').first().json.phone;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.phone);\nrows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\nconst row = rows.find(r => String(r.awaitingConfirmation).toLowerCase() === 'true');\n\nif (!row) {\n  return [{ json: { awaiting: false, phone } }];\n}\n\nconst minutesSince = (Date.now() - new Date(row.timestamp).getTime()) / 60000;\nif (!(minutesSince <= 30)) {\n  return [{ json: { awaiting: false, expired: true, phone, row_number: row.row_number } }];\n}\n\nlet items = [];\ntry { items = JSON.parse(row.items || '[]'); } catch (e) {}\n\nreturn [{\n  json: {\n    awaiting: true,\n    orderId: row.orderId,\n    items,\n    total: row.total,\n    address: row.address,\n    status: row.status,\n    orderTimestamp: row.timestamp,\n    phone: row.phone,\n    row_number: row.row_number,\n    customerMessage: $('Extract Message').first().json.messageBody\n  }\n}];"
+      },
+      "id": "ca182fae-b3d1-4d92-b5bd-6f885f0c63c1",
+      "name": "Compute Pending Cancellation Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        41040,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cw1",
+              "leftValue": "={{ String($json.awaiting) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f7da605a-8b28-44b8-98bc-45d03018e1d0",
+      "name": "Awaiting Cancellation Confirmation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        41264,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "244215354",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "phone",
+              "lookupValue": "={{ $('Extract Message').first().json.phone }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": "returnAllMatches"
+        }
+      },
+      "id": "6189711f-b040-49d2-be60-d5011b71af23",
+      "name": "Fetch History (For Cancellation)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        41488,
+        1744
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nconst pending = $('Compute Pending Cancellation Status').first().json;\nconst maxCtx = parseInt(($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20'), 10);\n\nlet historyLines = [];\nfor (const item of allItems) {\n  const row = item.json;\n  if (!row.message || !row.direction) continue;\n  const role = row.direction === 'outgoing' ? 'Bot' : 'Customer';\n  historyLines.push(role + ': ' + String(row.message));\n}\nhistoryLines = historyLines.slice(-(maxCtx - 1));\nconst conversationHistory = historyLines.length > 0 ? historyLines.join('\\n') : '(no recent history)';\n\nreturn [{\n  json: {\n    phone: pending.phone,\n    orderId: pending.orderId,\n    items: pending.items,\n    total: pending.total,\n    address: pending.address,\n    status: pending.status,\n    orderTimestamp: pending.orderTimestamp,\n    customerMessage: pending.customerMessage,\n    row_number: pending.row_number,\n    conversationHistory\n  }\n}];"
+      },
+      "id": "883861ab-41dd-4e08-a0a6-187fe02fe152",
+      "name": "Build Cancellation Classify Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        41712,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "id": "f7280443-e157-4607-895d-4095101cd08b",
+      "name": "Cancellation Confirmation Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        42016,
+        1968
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "q5ot0v1b7NSZ3Hav",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ '<context>\\n' +'<customer_phone>' + $json.phone + '</customer_phone>\\n' +'<order_id>' + $json.orderId + '</order_id>\\n' +'<order_items>' + JSON.stringify($json.items) + '</order_items>\\n' +'<order_total>' + $json.total + '</order_total>\\n' +'<order_status>' + $json.status + '</order_status>\\n' +'<order_timestamp>' + $json.orderTimestamp + '</order_timestamp>\\n' +'<conversation_history>\\n' + $json.conversationHistory + '\\n</conversation_history>\\n' +'<customer_latest_reply>' + $json.customerMessage + '</customer_latest_reply>\\n' +'</context>\\n\\n' +'<task>\\n' +'The customer was asked to confirm whether they want to cancel or modify an already-placed order (their most recent order, shown above), with exactly two options: confirm (cancel/change it -- staff will take over) or keep it as is. Classify their latest reply into exactly one of these three outcomes:\\n\\n' +'- confirmed: they clearly want to proceed with cancelling or changing this specific placed order.\\n' +'- declined: they clearly want to keep the order as is, with no cancellation or change.\\n' +'- unclear: anything else -- a question, an unrelated message, or a reply that does not clearly address the confirmation at all.\\n' +'</task>\\n\\n' +'<output_format>\\n' +'Reply with STRICT JSON only, no other text: {\"result\": \"confirmed\"} or {\"result\": \"declined\"} or {\"result\": \"unclear\"}.\\n' +'</output_format>' }}"
+      },
+      "id": "caf5c4b3-a692-43c5-920f-7b09d87f7c11",
+      "name": "Classify Cancellation Confirmation",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        41936,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst raw = item.text || (item.response && item.response.text) || item.output || '';\nlet result = 'unclear';\ntry {\n  const match = String(raw).match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match ? match[0] : raw);\n  if (['confirmed', 'declined', 'unclear'].includes(parsed.result)) {\n    result = parsed.result;\n  }\n} catch (e) {\n  result = 'unclear';\n}\n\nconst pending = $('Build Cancellation Classify Input').first().json;\nreturn [{\n  json: {\n    result,\n    phone: pending.phone,\n    row_number: pending.row_number,\n    orderId: pending.orderId,\n    items: pending.items,\n    total: pending.total,\n    address: pending.address,\n    status: pending.status,\n    orderTimestamp: pending.orderTimestamp\n  }\n}];"
+      },
+      "id": "98b87c25-3057-4386-8924-7bcf8c57bb7a",
+      "name": "Parse Cancellation Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        42288,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cc1",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "confirmed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5dafe4af-63de-4ce0-8845-46d8ffddd907",
+      "name": "Is Cancellation Confirmed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        42512,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cd1",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "declined",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b3640184-b6fe-4057-85c6-a6055713303c",
+      "name": "Is Cancellation Declined?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        42736,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingCancellations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Parse Cancellation Confirmation').first().json.row_number }}",
+            "awaitingConfirmation": "false"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a78206f-b4fb-4c83-84f3-330644cdff59",
+      "name": "Clear Pending Cancellation Flag (Confirmed)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        43184,
+        2192
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingCancellations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Parse Cancellation Confirmation').first().json.row_number }}",
+            "awaitingConfirmation": "false"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bf9502d9-2170-4e32-b649-1f7aff293374",
+      "name": "Clear Pending Cancellation Flag (Not Confirmed)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        42960,
+        1856
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1T2R4BUI8NWnQ8IxJFztL5J7U29pGzc4-HHrnafJro9Y",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PendingCancellations",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Compute Pending Cancellation Status').first().json.row_number }}",
+            "awaitingConfirmation": "false"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "awaitingConfirmation",
+              "displayName": "awaitingConfirmation",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1d9e5284-3ccc-430a-82b7-af4cb68bb4c8",
+      "name": "Clear Pending Cancellation Flag (Expired)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        42960,
+        2368
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q52dbWoN6OaKRDZO",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Cancellation Confirmation').first().json;\nconst items = parsed.items || [];\nconst itemLines = items.map(i => '- ' + i.name + ' x' + i.qty).join('; ');\nconst msg = 'Theek hai, aap ki request team ko bhej di gayi hai. Order ID ' + parsed.orderId + ' ke baare mein team aap se rabta karegi.';\nconst handoffReason = 'Customer confirmed cancel/modify request for placed order ' + parsed.orderId +\n  ' (items: ' + itemLines + ', total: Rs. ' + parsed.total +\n  ', address: ' + parsed.address + ', status at request time: ' + parsed.status +\n  ', order placed at: ' + parsed.orderTimestamp + ')';\nconst handoffTag = '<<<HANDOFF:' + JSON.stringify({ reason: handoffReason }) + '>>>';\nreturn [{ json: { output: msg + '\\n' + handoffTag } }];"
+      },
+      "id": "8e59fb43-eb25-452a-8a92-c8143b482253",
+      "name": "Build Confirmed Cancellation Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        43728,
+        2192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const classifyInput = $('Build Cancellation Classify Input').first().json;\nconst vars = $('Extract Message').first().json;\n\nconst pendingNote = 'You previously asked the customer to confirm whether to cancel/modify this already-placed order: ' +\n  'Order ID ' + classifyInput.orderId + ', items ' + JSON.stringify(classifyInput.items) +\n  ', total Rs. ' + classifyInput.total + ', status ' + classifyInput.status +\n  '. Their last reply did not clearly confirm or decline that. First briefly address ' +\n  'whatever they just said, then politely ask again for confirmation as a numbered list: ' +\n  '1. Confirm cancel/modify  2. Keep the order as is. Do not append the HANDOFF tag yourself -- ' +\n  'this is handled automatically once they clearly confirm.';\n\nreturn [{\n  json: {\n    userMessage: vars.messageBody,\n    phone: vars.phone,\n    turnNote: pendingNote\n  }\n}];"
+      },
+      "id": "b9f7c098-4798-4a21-a5d3-9d5fcdd472c1",
+      "name": "Build Agent Input (Cancellation Pending Reminder)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        43184,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "ce1",
+              "leftValue": "={{ String($json.expired) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "352edccc-e8e4-41ff-bde6-4621dd988e1b",
+      "name": "Expired Cancellation Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        42736,
+        2224
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "MCMPYJsqY1v0mnAE",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/MCMPYJsqY1v0mnAE",
+          "cachedResultName": "OTTO Tool -- Check Previous Order For Cancellation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('phone', `The customer's phone number, exactly as given in the conversation, whose most recent placed order should be looked up for cancellation/modification`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        44048,
+        1936
+      ],
+      "id": "344f4b78-ac79-47c4-8026-040bc6e1f30d",
+      "name": "Call 'OTTO Tool -- Check Previous Order For Cancellation'"
+    },
+    {
+      "parameters": {},
+      "id": "93cb8853-f5d3-49cf-9294-601e0df255d8",
+      "name": "Limit To One Item",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        45600,
+        2208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.phone);\nif (rows.length === 0) {\n  return [{ json: { status: '' } }];\n}\n\nrows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\nconst latest = rows[0];\n\nreturn [{\n  json: {\n    status: latest.status || '',\n    reason: latest.reason || '',\n    row_number: latest.row_number,\n    timestamp: latest.timestamp\n  }\n}];"
+      },
+      "id": "b4310b1d-5583-4424-a0b0-b26299eefbd6",
+      "name": "Compute Latest Handoff Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        38000,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extract Message').first().json.phone }}",
+        "contextWindowLength": "={{ parseInt($('Bot Config Map').first().json.MAX_CONTEXT_MESSAGES || '20', 10) }}"
+      },
+      "id": "3a192dd3-627a-473b-bdde-6b932f285c4b",
+      "name": "Redis Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.3,
+      "position": [
+        43536,
+        1936
+      ],
+      "credentials": {
+        "redis": {
+          "id": "VtdDFhdvINZplsxq",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "~anthropic/claude-haiku-latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        43408,
+        1936
+      ],
+      "id": "6e6f14b2-1ef8-498b-8405-b34ae004e50c",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "W1cJFxwZLdxXUK0i",
+          "name": "OpenRouter account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Baileys Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Bot Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Bot Config": {
+      "main": [
+        [
+          {
+            "node": "Bot Config Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot Config Map": {
+      "main": [
+        [
+          {
+            "node": "Parse Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Webhook": {
+      "main": [
+        [
+          {
+            "node": "Has Voice?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Voice?": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe": {
+      "main": [
+        [
+          {
+            "node": "Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [
+          {
+            "node": "Check Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Handoff": {
+      "main": [
+        [
+          {
+            "node": "Compute Latest Handoff Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Handed Off?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Check Pending Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Get Menu": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Check Order": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Process Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Reply": {
+      "main": [
+        [
+          {
+            "node": "Send via Baileys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Baileys": {
+      "main": [
+        [
+          {
+            "node": "Log Incoming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Incoming": {
+      "main": [
+        [
+          {
+            "node": "Log Outgoing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Outgoing": {
+      "main": [
+        [
+          {
+            "node": "Track Spend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Spend": {
+      "main": [
+        [
+          {
+            "node": "Update Spend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Spend": {
+      "main": [
+        [
+          {
+            "node": "Limit To One Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Order?": {
+      "main": [
+        [
+          {
+            "node": "Append Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handoff Requested?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Order": {
+      "main": [
+        [
+          {
+            "node": "Notify Owner Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Owner Order": {
+      "main": [
+        [
+          {
+            "node": "ACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handoff Requested?": {
+      "main": [
+        [
+          {
+            "node": "Log Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Handoff": {
+      "main": [
+        [
+          {
+            "node": "Notify Owner Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Owner Handoff": {
+      "main": [
+        [
+          {
+            "node": "ACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'OTTO Tool -- Check Duplicate Order'": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Pending Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Compute Pending Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Pending Status": {
+      "main": [
+        [
+          {
+            "node": "Awaiting Confirmation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Awaiting Confirmation?": {
+      "main": [
+        [
+          {
+            "node": "Fetch History (For Confirmation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Expired Pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History (For Confirmation)": {
+      "main": [
+        [
+          {
+            "node": "Build Classify Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Classify Input": {
+      "main": [
+        [
+          {
+            "node": "Classify Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmation Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Confirmation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Parse Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Is Confirmed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Flag (Confirmed)": {
+      "main": [
+        [
+          {
+            "node": "Build Confirmed Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Confirmed Reply": {
+      "main": [
+        [
+          {
+            "node": "Process Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Flag (Not Confirmed)": {
+      "main": [
+        [
+          {
+            "node": "Check Pending Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Confirmed?": {
+      "main": [
+        [
+          {
+            "node": "Clear Pending Flag (Confirmed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Declined?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Declined?": {
+      "main": [
+        [
+          {
+            "node": "Clear Pending Flag (Not Confirmed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Agent Input (Pending Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Input (Pending Reminder)": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expired Pending?": {
+      "main": [
+        [
+          {
+            "node": "Clear Pending Flag (Expired)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Pending Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Flag (Expired)": {
+      "main": [
+        [
+          {
+            "node": "Check Pending Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Pending Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Compute Pending Cancellation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Pending Cancellation Status": {
+      "main": [
+        [
+          {
+            "node": "Awaiting Cancellation Confirmation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Awaiting Cancellation Confirmation?": {
+      "main": [
+        [
+          {
+            "node": "Fetch History (For Cancellation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Expired Cancellation Pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History (For Cancellation)": {
+      "main": [
+        [
+          {
+            "node": "Build Cancellation Classify Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Cancellation Classify Input": {
+      "main": [
+        [
+          {
+            "node": "Classify Cancellation Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Cancellation Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Parse Cancellation Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Cancellation Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Is Cancellation Confirmed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Cancellation Confirmed?": {
+      "main": [
+        [
+          {
+            "node": "Clear Pending Cancellation Flag (Confirmed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Cancellation Declined?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Cancellation Flag (Confirmed)": {
+      "main": [
+        [
+          {
+            "node": "Build Confirmed Cancellation Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Confirmed Cancellation Reply": {
+      "main": [
+        [
+          {
+            "node": "Process Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Cancellation Declined?": {
+      "main": [
+        [
+          {
+            "node": "Clear Pending Cancellation Flag (Not Confirmed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Agent Input (Cancellation Pending Reminder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Cancellation Flag (Not Confirmed)": {
+      "main": [
+        [
+          {
+            "node": "Build Agent Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Input (Cancellation Pending Reminder)": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expired Cancellation Pending?": {
+      "main": [
+        [
+          {
+            "node": "Clear Pending Cancellation Flag (Expired)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Agent Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending Cancellation Flag (Expired)": {
+      "main": [
+        [
+          {
+            "node": "Build Agent Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancellation Confirmation Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Cancellation Confirmation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'OTTO Tool -- Check Previous Order For Cancellation'": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit To One Item": {
+      "main": [
+        [
+          {
+            "node": "Has Order?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Latest Handoff Status": {
+      "main": [
+        [
+          {
+            "node": "Already Handed Off?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "715e777c-c07d-44ac-91e0-89c0b5263449",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6a182e137b0efa52bc5ca70ffff0b22c853fa1e0bdd46efb5c0d20201c291f2e"
+  },
+  "nodeGroups": [],
+  "id": "YxAzeo6Tr1zSJPwW",
+  "tags": []
+}
