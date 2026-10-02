@@ -12,7 +12,7 @@ Decisions (2026-10-02): JavaScript, LangGraph.js, OpenRouter, hosted on Vercel, 
 1. **The LLM never produces facts.** Items, prices, totals, order status and order IDs come from MongoDB via code. The LLM may only rephrase facts it is handed. (This is the fix for execution 5715, where the agent invented four karahis.)
 2. **Numbered replies are resolved in code.** When the bot shows a numbered list, the options are saved in state. A reply of "9" is mapped to option 9 by code; no LLM involved.
 3. **Conversation state lives in the graph**, checkpointed per phone. The pending-confirmation and pending-cancellation flows become `stage` values, not separate collections and classifier calls.
-4. **At most 2 LLM calls per message**: `understand` (always) and `compose` (most turns). Everything else is plain code.
+4. **At most 2 LLM calls per message**: `understand` (always, except plain number replies, which need none) and `compose` (only for item questions). All other replies are Roman Urdu templates filled from the database.
 5. **Small prompts**: each LLM node gets a short, single-purpose prompt plus structured input.
 
 ---
@@ -142,7 +142,7 @@ START
 | `route` | code | Conditional edge. Stage wins over intent when the customer is answering a pending question. |
 | `showCategories` | code | Distinct categories from menu -> numbered list -> `lastShownList`. |
 | `showItems` | code | Items of chosen category with prices -> numbered list -> `lastShownList`. |
-| `updateCart` | code | Fuzzy-match item text to menu (Fuse.js). One match -> add. Several (sizes/variants) -> show options list. None -> "not on menu" + closest suggestions. |
+| `addItemsByName` | code | `src/matcher.js`: token matching tolerant to Roman Urdu spelling, size words (bari/chota/16 inch) and piece counts. Matched -> add. Size missing -> size list. Close candidates -> choice list. Category word ("pizza") -> category list. Generic word ("chicken") -> ask. Unknown -> "not on menu". |
 | `setAddress` | code | Store address; if cart non-empty -> `reviewOrder`. |
 | `reviewOrder` | code | Missing address -> ask. Else build summary with totals (computed in code) -> stage `awaiting_order_confirm`. |
 | `resolvePending` | code | `awaiting_order_confirm` + confirm -> `duplicateCheck`. `awaiting_duplicate_confirm` + confirm -> `placeOrder`; decline/modify -> clear. `awaiting_cancel_confirm` + confirm -> `createHandoff`; decline -> keep order. Unclear -> re-ask with the same options. |
@@ -152,7 +152,7 @@ START
 | `cancelRequest` | code | Latest order. `preparing` -> stage `awaiting_cancel_confirm`. Otherwise explain it can no longer be changed. |
 | `createHandoff` | code | Insert into `handoffs` (`status: 'active'`). Emit `handoff_created`. |
 | `smallTalk` | code | Greeting / off-topic facts (one-line scope message). |
-| `compose` | LLM | Turns `facts` into a short Roman Urdu reply. Numbered lists are rendered by code and inserted verbatim via a `{{LIST}}` placeholder -- the LLM cannot change items or prices. |
+| `compose` | LLM | Used only by `itemQuestion` ("meal 5 mein kya hai"). Gets the menu facts of the matched items; any 2+ digit number in its answer that is not in the facts rejects the answer and a template is used instead. |
 | `persist` | code | Insert user + assistant docs into `conversations` (`role`, `sessionId`). Record token usage/cost from OpenRouter into `botconfigs` (`LLM_SPENT`). Store reply under `messageId` for idempotency. |
 
 ---
@@ -260,6 +260,6 @@ Dependencies: `@langchain/langgraph`, `@langchain/langgraph-checkpoint-mongodb`,
 | 1 | Where is MongoDB hosted? | MongoDB Atlas -- reachable from Vercel, no blocker |
 | 2 | Explicit "confirm" before placing an order? | Yes -- `awaiting_order_confirm` stays mandatory before the duplicate check |
 | 3 | Reply language | Always Roman Urdu |
-| 4 | Variants/sizes grouping | Open -- each size is its own `menuitems` document today; revisit in phase 2 |
+| 4 | Variants/sizes grouping | Grouped in code for display and size questions; data unchanged (each size stays its own `menuitems` document) |
 
 Code lives in its own repo: `C:\folderF\otto-agent` (README there).
