@@ -12,7 +12,7 @@ Decisions (2026-10-02): JavaScript, LangGraph.js, OpenRouter, hosted on Vercel, 
 1. **The LLM never produces facts.** Items, prices, totals, order status and order IDs come from MongoDB via code. The LLM may only rephrase facts it is handed. (This is the fix for execution 5715, where the agent invented four karahis.)
 2. **Numbered replies are resolved in code.** When the bot shows a numbered list, the options are saved in state. A reply of "9" is mapped to option 9 by code; no LLM involved.
 3. **Conversation state lives in the graph**, checkpointed per phone. The pending-confirmation and pending-cancellation flows become `stage` values, not separate collections and classifier calls.
-4. **At most 2 LLM calls per message**: `understand` (always, except plain number replies, which need none) and `compose` (only for item questions). All other replies are Roman Urdu templates filled from the database.
+4. **LLM calls per message**: `understand` (temperature 0; skipped for plain number replies) and `humanize` (temperature 0.7, rewrites only the conversational sentences of the template reply). `compose` is added only for item questions. Lists, prices, totals, order ids and addresses are locked in code and never pass through the model's output.
 5. **Small prompts**: each LLM node gets a short, single-purpose prompt plus structured input.
 
 ---
@@ -263,3 +263,23 @@ Dependencies: `@langchain/langgraph`, `@langchain/langgraph-checkpoint-mongodb`,
 | 4 | Variants/sizes grouping | Grouped in code for display and size questions; data unchanged (each size stays its own `menuitems` document) |
 
 Code lives in its own repo: `C:\folderF\otto-agent` (README there).
+
+---
+
+## 11. Conversational layer (humanize) and add-ons -- 2026-10-03
+
+**humanize** (`src/nodes/humanize.js`): the template reply is split into fixed blocks
+(lists, `Rs.` lines, totals, Order ID, address, status) and prose sentences. The model sees
+the whole draft but returns only `{ opening, segments[] }`; code rebuilds the message in the
+original layout. Per sentence, a rewrite is rejected (original sentence used) if it drops an
+instruction word (bas, number, menu, address, confirm...), adds a number, or adds a claim word
+(confirm/place/cancel/tayyar/deliver/rider/minute) the draft did not contain. Timeout 6 s ->
+template. Cost: ~+1.7 s per message on gpt-4o-mini. `HUMANIZE=off` disables it.
+
+**Add-ons** (`src/addons.js`): meal +250 and cheese slice +70 for `Burgers`; extra topping
+100/150/200/250 by size for all pizza categories. Requested in the order message (extras
+extracted by `understand`), afterwards (`add_extras` intent -> `addExtras`), or through a
+one-time upsell after a plain burger (`applyUpsell`). Each cart line = item + its add-ons
+(unit price includes them); orders store `name` with add-ons and an `addons` array.
+Open: should Double Decker Burgers also get the meal/cheese upgrade? (default: no)
+
