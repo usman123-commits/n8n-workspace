@@ -12,7 +12,7 @@ Decisions (2026-10-02): JavaScript, LangGraph.js, OpenRouter, hosted on Vercel, 
 1. **The LLM never produces facts.** Items, prices, totals, order status and order IDs come from MongoDB via code. The LLM may only rephrase facts it is handed. (This is the fix for execution 5715, where the agent invented four karahis.)
 2. **Numbered replies are resolved in code.** When the bot shows a numbered list, the options are saved in state. A reply of "9" is mapped to option 9 by code; no LLM involved.
 3. **Conversation state lives in the graph**, checkpointed per phone. The pending-confirmation and pending-cancellation flows become `stage` values, not separate collections and classifier calls.
-4. **LLM calls per message**: `understand` (temperature 0; skipped for plain number replies) and `humanize` (temperature 0.7, rewrites only the conversational sentences of the template reply). `compose` is added only for item questions. Lists, prices, totals, order ids and addresses are locked in code and never pass through the model's output.
+4. **LLM calls per message**: `understand` (temperature 0; skipped for plain number replies) and the final `writer` (temperature 0.7, writes the whole message from the template draft; its output is checked against the draft's facts). `compose` is added only for item questions. Lists, prices, totals, order ids and addresses are locked in code and never pass through the model's output.
 5. **Small prompts**: each LLM node gets a short, single-purpose prompt plus structured input.
 
 ---
@@ -282,4 +282,26 @@ extracted by `understand`), afterwards (`add_extras` intent -> `addExtras`), or 
 one-time upsell after a plain burger (`applyUpsell`). Each cart line = item + its add-ons
 (unit price includes them); orders store `name` with add-ons and an `addons` array.
 Open: should Double Decker Burgers also get the meal/cheese upgrade? (default: no)
+
+---
+
+## 12. Final writer replaces humanize -- 2026-10-03
+
+humanize could only touch sentences between locked blocks, so menu replies (mostly lists)
+still read like SMS. The final `writer` node sits in the same place (one LLM call) but writes
+the whole message; safety moved from "lock before" to "check after" (`checkOutput`):
+
+| Check | Why |
+|-------|-----|
+| no digits not in draft / customer message / option numbers | no invented prices, times, quantities |
+| numbered lines exactly 1..N, each still naming its option (distinguishing words) | number replies keep working |
+| every `Rs.` amount, cart line, total, Order ID, address present | nothing dropped |
+| no new claim words (rider, deliver, minute, free, discount, offer) | no promises |
+| no "... ho gaya / kar diya" or "order ... tayyar" unless the draft's own sentences say it | no false status |
+| no real menu item name the draft did not mention | no off-list upselling / invented items |
+| "bas" / address request kept | next step kept |
+
+Failed check -> the draft is sent (logged; `WRITER_DEBUG=1` prints the rejected text).
+A number reply's meaning is passed as `<customer_picked>` so the writer never re-maps "1".
+Category words ("pizza dikha dein") are resolved in code in `showCategories` too.
 
